@@ -21,5 +21,6 @@ fmt:
 
 .PHONY: js
 js:
+	tsc -T ES2018 --strict web/main.ts
 	tsc -T ES2018 --strict web/ww.ts
 	tsc -T ES2018 --strict web/sw.ts

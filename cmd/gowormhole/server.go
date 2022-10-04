@@ -20,23 +20,25 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bingoohuang/gowormhole"
+
 	"github.com/NYTimes/gziphandler"
+	"github.com/bingoohuang/gowormhole/wormhole"
 	webrtc "github.com/pion/webrtc/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/crypto/acme/autocert"
 	"nhooyr.io/websocket"
-	"webwormhole.io/wormhole"
 )
 
-// slotTimeout is the the maximum amount of time a client is allowed to
+// slotTimeout is the maximum amount of time a client is allowed to
 // hold a slot.
 const slotTimeout = 12 * time.Hour
 
 const importMeta = `<!doctype html>
 <meta charset=utf-8>
-<meta name="go-import" content="webwormhole.io git https://github.com/saljam/webwormhole">
-<meta http-equiv="refresh" content="0;URL='https://github.com/saljam/webwormhole'">
+<meta name="go-import" content="gowormhole.d5k.co git https://github.com/bingoohuang/gowormhole">
+<meta http-equiv="refresh" content="0;URL='https://github.com/bingoohuang/gowormhole'">
 `
 
 const serviceWorkerPage = `You're not supposed to get this file or end up here.
@@ -101,8 +103,11 @@ var slots = struct {
 // turnSecret, turnServer, and stunServers are used to generate ICE config
 // and send it to clients as soon as they connect.
 var turnSecret string
-var turnServer string
-var stunServers []webrtc.ICEServer
+
+var (
+	turnServer  string
+	stunServers []webrtc.ICEServer
+)
 
 // freeslot tries to find an available numeric slot, favouring smaller numbers.
 // This assume slots is locked.
@@ -182,8 +187,8 @@ func relay(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), slotTimeout)
 
 	initmsg := struct {
-		Slot       string             `json:"slot",omitempty`
-		ICEServers []webrtc.ICEServer `json:"iceServers",omitempty`
+		Slot       string             `json:"slot,omitempty"`
+		ICEServers []webrtc.ICEServer `json:"iceServers,omitempty"`
 	}{}
 	initmsg.ICEServers = append(turnServers(), stunServers...)
 
@@ -338,7 +343,6 @@ func server(args ...string) {
 	secretpath := set.String("secrets", os.Getenv("HOME")+"/keys", "path to put let's encrypt cache")
 	cert := set.String("cert", "", "https certificate (leave empty to use letsencrypt)")
 	key := set.String("key", "", "https certificate key")
-	html := set.String("ui", "./web", "path to the web interface files")
 	stunservers := set.String("stun", "stun:relay.webwormhole.io", "list of STUN server addresses to tell clients to use")
 	set.StringVar(&turnServer, "turn", "", "TURN server to use for relaying")
 	set.StringVar(&turnSecret, "turn-secret", "", "secret for HMAC-based authentication in TURN server")
@@ -359,7 +363,7 @@ func server(args ...string) {
 		stunServers = append(stunServers, webrtc.ICEServer{URLs: []string{s}})
 	}
 
-	fs := gziphandler.GzipHandler(http.FileServer(http.Dir(*html)))
+	fs := gziphandler.GzipHandler(http.FileServer(http.FS(gowormhole.Web)))
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		// Handle WebSocket connections.
 		if strings.ToLower(r.Header.Get("Upgrade")) == "websocket" {
@@ -377,7 +381,10 @@ func server(args ...string) {
 		// https://bugs.webkit.org/show_bug.cgi?id=201591
 		csp := "default-src 'self'; script-src 'self' 'unsafe-eval'; img-src 'self' blob:; connect-src 'self' ws://localhost/"
 		for _, host := range strings.Split(*hosts, ",") {
-			csp += fmt.Sprintf(" wss://%v", host)
+			if host != "" {
+				csp += fmt.Sprintf(" wss://%v", host)
+				csp += fmt.Sprintf(" ws://%v", host)
+			}
 		}
 		w.Header().Set("Content-Security-Policy", csp)
 

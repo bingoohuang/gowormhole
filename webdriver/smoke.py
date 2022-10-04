@@ -51,8 +51,8 @@ driver2 = webdriver.Chrome(options=opts)
 
 try:
 
-	driver1.get("https://webwormhole.io")
-	driver2.get("https://webwormhole.io")
+	driver1.get("http://gowormhole.d5k.co")
+	driver2.get("http://gowormhole.d5k.co")
 	
 	driver1.find_element(By.ID, 'dial').click()
 	WebDriverWait(driver1, 10).until(

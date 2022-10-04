@@ -259,8 +259,8 @@ func writeBase64(ws *websocket.Conn, p []byte) error {
 // and ICE servers to use.
 func readInitMsg(ws *websocket.Conn) (slot string, iceServers []webrtc.ICEServer, err error) {
 	msg := struct {
-		Slot       string             `json:"slot",omitempty`
-		ICEServers []webrtc.ICEServer `json:"iceServers",omitempty`
+		Slot       string             `json:"slot,omitempty"`
+		ICEServers []webrtc.ICEServer `json:"iceServers,omitempty"`
 	}{}
 
 	_, buf, err := ws.Read(context.TODO())

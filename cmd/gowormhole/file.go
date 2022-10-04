@@ -16,9 +16,9 @@ const (
 )
 
 type header struct {
-	Name string `json:"name",omitempty`
-	Size int    `json:"size",omitempty`
-	Type string `json:"type",omitempty`
+	Name string `json:"name,omitempty"`
+	Size int    `json:"size,omitempty"`
+	Type string `json:"type,omitempty"`
 }
 
 func receive(args ...string) {

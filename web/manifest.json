@@ -27,5 +27,5 @@
 		"icon.svg",
 		"space.svg"
 	],
-	"content_security_policy": "default-src 'self'; script-src 'self' 'wasm-eval'; img-src 'self' blob:; connect-src wss://webwormhole.io"
+	"content_security_policy": "default-src 'self'; script-src 'self' 'wasm-eval'; img-src 'self' blob:; connect-src ws://gowormhole.d5k.co"
 }

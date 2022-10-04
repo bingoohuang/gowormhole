@@ -54,5 +54,4 @@ func TestMatch(t *testing.T) {
 			t.Errorf("testcase %v (%v) got %v want %v", i, c.prefix, hint, c.word)
 		}
 	}
-
 }

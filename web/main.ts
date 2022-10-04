@@ -883,7 +883,7 @@ async function init() {
 	browserhacks();
 
 	if (hacks.ext) {
-		signalserver = new URL("https://webwormhole.io/");
+		signalserver = new URL("http://gowormhole.d5k.co/");
 	}
 	let wasmURL = "webwormhole.wasm";
 	if (hacks.chromeext) {

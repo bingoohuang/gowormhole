@@ -1,7 +1,4 @@
 // Command ww moves files and other data over WebRTC.
-//
-// Install using:
-//	go get -u webwormhole.io/cmd/ww
 package main
 
 import (
@@ -13,9 +10,11 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/bingoohuang/gg/pkg/v"
+
+	"github.com/bingoohuang/gowormhole/wordlist"
+	"github.com/bingoohuang/gowormhole/wormhole"
 	"rsc.io/qr"
-	"webwormhole.io/wordlist"
-	"webwormhole.io/wormhole"
 )
 
 var subcmds = map[string]func(args ...string){
@@ -26,8 +25,8 @@ var subcmds = map[string]func(args ...string){
 }
 
 var (
-	verbose bool   = false
-	sigserv string = "https://webwormhole.io"
+	verbose = true
+	sigserv = "http://gowormhole.d5k.co"
 )
 
 var stderr = flag.CommandLine.Output()
@@ -45,10 +44,16 @@ func usage() {
 }
 
 func main() {
+	showVersion := flag.Bool("version", false, "show version and exit")
 	flag.BoolVar(&verbose, "verbose", LookupEnvOrBool("WW_VERBOSE", verbose), "verbose logging")
 	flag.StringVar(&sigserv, "signal", LookupEnvOrString("WW_SIGSERV", sigserv), "signalling server to use")
 	flag.Usage = usage
 	flag.Parse()
+	if *showVersion {
+		fmt.Println(v.Version())
+		os.Exit(0)
+	}
+
 	if flag.NArg() < 1 {
 		usage()
 		os.Exit(2)
@@ -80,9 +85,9 @@ func newConn(code string, length int) *wormhole.Wormhole {
 		if err == wormhole.ErrBadVersion {
 			fatalf(
 				"%s%s%s",
-				"the signalling server is running an incompatable version.\n",
+				"the signalling server is running an incompatible version.\n",
 				"try upgrading the client:\n\n",
-				"    go get webwormhole.io/cmd/ww\n",
+				"    go get github.com/bingoohuang/gowormhole/cmd/gowormhole\n",
 			)
 		}
 		if err != nil {
@@ -115,7 +120,7 @@ func newConn(code string, length int) *wormhole.Wormhole {
 			"%s%s%s",
 			"the signalling server is running an incompatable version.\n",
 			"try upgrading the client:\n\n",
-			"    go get webwormhole.io/cmd/ww\n",
+			"    go get github.com/bingoohuang/gowormhole/cmd/ww\n",
 		)
 	}
 	if err != nil {

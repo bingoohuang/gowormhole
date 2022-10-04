@@ -1,3 +1,5 @@
+# gowormhole
+
 THIS PROJECT IS STILL IN EARLY DEVELOPMENT IT USES EXPERIMENTAL
 CRYPTOGRAPHIC LIBRARIES AND IT HAS NOT HAD ANY KIND OF SECURITY
 OR CRYPTOGRAPHY REVIEW THIS SOFTWARE MIGHT BE BROKEN AND UNSAFE
@@ -12,18 +14,18 @@ On one computer the tool generates a one-time code:
 
 	$ cat hello.txt
 	hello, world
-	$ ww send hello.txt
+	$ gowormhole send hello.txt
 	east-pep-aloe
 
 On another use the code to establish a connection:
 
-	$ ww receive east-pep-aloe
+	$ gowormhole receive east-pep-aloe
 	$ cat hello.txt
 	hello, world
 
 To install the command line tool:
 
-	$ go install webwormhole.io/cmd/ww@latest
+	$ go install github.com/bingoohuang/cmd/gowormhole@latest
 
 This requires Go 1.13 or newer.
 
@@ -31,7 +33,7 @@ To run the signalling server you need to compile the WebAssembly
 files first.
 
 	$ make wasm
-	$ ww server -https= -http=localhost:8000
+	$ gowormhole server -https= -http=localhost:8000
 
 To package the browser extension for Firefox or Chrome:
 
