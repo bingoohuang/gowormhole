@@ -1,5 +1,9 @@
 # gowormhole
 
+![img.png](_doc/cli.png)
+
+![img.png](_doc/web.png)
+
 THIS PROJECT IS STILL IN EARLY DEVELOPMENT IT USES EXPERIMENTAL
 CRYPTOGRAPHIC LIBRARIES AND IT HAS NOT HAD ANY KIND OF SECURITY
 OR CRYPTOGRAPHY REVIEW THIS SOFTWARE MIGHT BE BROKEN AND UNSAFE
@@ -26,8 +30,6 @@ On another use the code to establish a connection:
 To install the command line tool:
 
 	$ go install github.com/bingoohuang/cmd/gowormhole@latest
-
-This requires Go 1.13 or newer.
 
 To run the signalling server you need to compile the WebAssembly
 files first.

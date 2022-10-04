@@ -1,5 +1,5 @@
 .PHONY: wasm
-wasm:
+wasm: js
 	GOOS=js GOARCH=wasm go build -o ./web/webwormhole.wasm ./web
 	cp $(shell go env GOROOT)/misc/wasm/wasm_exec.js ./web/wasm_exec.js
 
