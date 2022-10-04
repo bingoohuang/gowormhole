@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/cheggaaa/pb/v3"
 )
 
 const (
@@ -62,7 +64,15 @@ func receive(args ...string) {
 			fatalf("could not create output file %s: %v", h.Name, err)
 		}
 		fmt.Fprintf(set.Output(), "receiving %v... ", h.Name)
-		written, err := io.CopyBuffer(f, io.LimitReader(c, int64(h.Size)), make([]byte, msgChunkSize))
+
+		reader := io.LimitReader(c, int64(h.Size))
+
+		bar := pb.Full.Start64(int64(h.Size))   // start new bar
+		barReader := bar.NewProxyReader(reader) // create proxy reader
+
+		written, err := io.CopyBuffer(f, barReader, make([]byte, msgChunkSize))
+		bar.Finish() // finish bar
+
 		if err != nil {
 			fatalf("\ncould not save file: %v", err)
 		}
@@ -114,7 +124,13 @@ func send(args ...string) {
 			fatalf("could not send file header: %v", err)
 		}
 		fmt.Fprintf(set.Output(), "sending %v... ", filepath.Base(filepath.Clean(filename)))
-		written, err := io.CopyBuffer(c, f, make([]byte, msgChunkSize))
+
+		bar := pb.Full.Start64(info.Size()) // start new bar
+		barWriter := bar.NewProxyWriter(c)  // create proxy reader
+
+		written, err := io.CopyBuffer(barWriter, f, make([]byte, msgChunkSize))
+		bar.Finish() // finish bar
+
 		if err != nil {
 			fatalf("\ncould not send file: %v", err)
 		}
