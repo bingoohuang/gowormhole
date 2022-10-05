@@ -138,3 +138,11 @@ the PAKE?
     INFO[0000] Attributes:
     INFO[0000] 	REALM: pion.ly
     ```
+
+2. [WebRTC, WebRTC and WebRTC. Everything here is all about WebRTC!!](https://github.com/muaz-khan/WebRTC-Experiment)
+
+    - FileBufferReader | File Sharing 
+    - FileBufferReader is a JavaScript library reads file and returns chunkified array-buffers. The resulting buffers can be shared using WebRTC data channels or socket.io.
+    - [Live Demo](https://www.webrtc-experiment.com/FileBufferReader/)
+    - [Github (open-sourced)](https://github.com/muaz-khan/FileBufferReader)
+    - [Youtube video presentation](https://www.youtube.com/watch?v=gv8xpdGdS4o)
