@@ -127,3 +127,14 @@ the PAKE?
 ## resources
 
 1. [Stunner](https://github.com/firefart/stunner) is a tool to test and exploit STUN, TURN and TURN over TCP servers.
+
+    ```sh
+    $ stunner info -s 127.0.0.1:3478
+    INFO[0000] this server supports the STUN protocol
+    INFO[0000] this server supports the TURN protocol with UDP transports
+    INFO[0000] Attributes:
+    INFO[0000] 	REALM: pion.ly
+    INFO[0000] this server supports the TURN protocol with TCP transports
+    INFO[0000] Attributes:
+    INFO[0000] 	REALM: pion.ly
+    ```
