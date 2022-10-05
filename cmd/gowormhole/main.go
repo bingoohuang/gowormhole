@@ -18,10 +18,12 @@ import (
 )
 
 var subcmds = map[string]func(args ...string){
-	"send":    send,
-	"receive": receive,
-	"pipe":    pipe,
-	"server":  server,
+	"send":        sendSubCmd,
+	"receive":     receiveSubCmd,
+	"pipe":        pipeSubCmd,
+	"server":      signallingServerCmd,
+	"turn":        turnServerSubCmd,
+	"turn-client": turnClientSubCmd,
 }
 
 var (

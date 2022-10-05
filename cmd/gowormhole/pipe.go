@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func pipe(args ...string) {
+func pipeSubCmd(args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		fmt.Fprintf(set.Output(), "netcat-like pipe\n\n")

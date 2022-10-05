@@ -23,17 +23,17 @@ type header struct {
 	Type string `json:"type,omitempty"`
 }
 
-func receive(args ...string) {
+func receiveSubCmd(args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
-		fmt.Fprintf(set.Output(), "receive files\n\n")
-		fmt.Fprintf(set.Output(), "usage: %s %s [code]\n\n", os.Args[0], args[0])
-		fmt.Fprintf(set.Output(), "flags:\n")
+		_, _ = fmt.Fprintf(set.Output(), "receive files\n\n")
+		_, _ = fmt.Fprintf(set.Output(), "usage: %s %s [code]\n\n", os.Args[0], args[0])
+		_, _ = fmt.Fprintf(set.Output(), "flags:\n")
 		set.PrintDefaults()
 	}
 	length := set.Int("length", 2, "length of generated secret, if generating")
 	directory := set.String("dir", ".", "directory to put downloaded files")
-	set.Parse(args[1:])
+	_ = set.Parse(args[1:])
 
 	if set.NArg() > 1 {
 		set.Usage()
@@ -63,7 +63,7 @@ func receive(args ...string) {
 		if err != nil {
 			fatalf("could not create output file %s: %v", h.Name, err)
 		}
-		fmt.Fprintf(set.Output(), "receiving %v... ", h.Name)
+		_, _ = fmt.Fprintf(set.Output(), "receiving %v... ", h.Name)
 
 		reader := io.LimitReader(c, int64(h.Size))
 
@@ -79,23 +79,23 @@ func receive(args ...string) {
 		if written != int64(h.Size) {
 			fatalf("\nEOF before receiving all bytes: (%d/%d)", written, h.Size)
 		}
-		f.Close()
-		fmt.Fprintf(set.Output(), "done\n")
+		_ = f.Close()
+		_, _ = fmt.Fprintf(set.Output(), "done\n")
 	}
-	c.Close()
+	_ = c.Close()
 }
 
-func send(args ...string) {
+func sendSubCmd(args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
-		fmt.Fprintf(set.Output(), "send files\n\n")
-		fmt.Fprintf(set.Output(), "usage: %s %s [files]...\n\n", os.Args[0], args[0])
-		fmt.Fprintf(set.Output(), "flags:\n")
+		_, _ = fmt.Fprintf(set.Output(), "send files\n\n")
+		_, _ = fmt.Fprintf(set.Output(), "usage: %s %s [files]...\n\n", os.Args[0], args[0])
+		_, _ = fmt.Fprintf(set.Output(), "flags:\n")
 		set.PrintDefaults()
 	}
 	length := set.Int("length", 2, "length of generated secret")
 	code := set.String("code", "", "use a wormhole code instead of generating one")
-	set.Parse(args[1:])
+	_ = set.Parse(args[1:])
 
 	if set.NArg() < 1 {
 		set.Usage()
@@ -123,7 +123,7 @@ func send(args ...string) {
 		if err != nil {
 			fatalf("could not send file header: %v", err)
 		}
-		fmt.Fprintf(set.Output(), "sending %v... ", filepath.Base(filepath.Clean(filename)))
+		_, _ = fmt.Fprintf(set.Output(), "sending %v... ", filepath.Base(filepath.Clean(filename)))
 
 		bar := pb.Full.Start64(info.Size()) // start new bar
 		barWriter := bar.NewProxyWriter(c)  // create proxy reader
@@ -137,8 +137,8 @@ func send(args ...string) {
 		if written != info.Size() {
 			fatalf("\nEOF before sending all bytes: (%d/%d)", written, info.Size())
 		}
-		f.Close()
-		fmt.Fprintf(set.Output(), "done\n")
+		_ = f.Close()
+		_, _ = fmt.Fprintf(set.Output(), "done\n")
 	}
-	c.Close()
+	_ = c.Close()
 }
