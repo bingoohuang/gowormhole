@@ -17,7 +17,7 @@ import (
 func turnClientSubCmd(args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
-		_, _ = fmt.Fprintf(set.Output(), "run the webwormhole TURN client\n\n")
+		_, _ = fmt.Fprintf(set.Output(), "run the gowormhole TURN client\n\n")
 		_, _ = fmt.Fprintf(set.Output(), "usage: %s %s\n\n", os.Args[0], args[0])
 		_, _ = fmt.Fprintf(set.Output(), "flags:\n")
 		set.PrintDefaults()

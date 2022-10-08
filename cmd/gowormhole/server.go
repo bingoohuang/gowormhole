@@ -315,7 +315,7 @@ func relay(w http.ResponseWriter, r *http.Request) {
 		}
 		if rconn == nil {
 			// We could synchronise with the rendezvous goroutine above and wait for
-			// B to connect, but receiving anything at this stage is a protocol violation
+			// B to connect, but receiving anything at this stage is a protocol violation,
 			// so we should just bail out.
 			return
 		}
@@ -331,19 +331,19 @@ func signallingServerCmd(args ...string) {
 
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
-		fmt.Fprintf(set.Output(), "run the webwormhole signalling server\n\n")
+		fmt.Fprintf(set.Output(), "run the gowormhole signalling server\n\n")
 		fmt.Fprintf(set.Output(), "usage: %s %s\n\n", os.Args[0], args[0])
 		fmt.Fprintf(set.Output(), "flags:\n")
 		set.PrintDefaults()
 	}
-	httpaddr := set.String("http", ":http", "http listen address")
-	httpsaddr := set.String("https", ":https", "https listen address")
-	debugaddr := set.String("debug", "", "debug and metrics listen address")
+	httpAddr := set.String("http", ":http", "http listen address")
+	httpsAddr := set.String("https", ":https", "https listen address")
+	debugAddr := set.String("debug", "", "debug and metrics listen address")
 	hosts := set.String("hosts", "", "comma separated list of hosts by which site is accessible")
-	secretpath := set.String("secrets", os.Getenv("HOME")+"/keys", "path to put let's encrypt cache")
+	secretPath := set.String("secrets", os.Getenv("HOME")+"/keys", "path to put let's encrypt cache")
 	cert := set.String("cert", "", "https certificate (leave empty to use letsencrypt)")
 	key := set.String("key", "", "https certificate key")
-	stunservers := set.String("stun", "stun:relay.webwormhole.io", "list of STUN server addresses to tell clients to use")
+	stun := set.String("stun", "stun:relay.webwormhole.io", "list of STUN server addresses to tell clients to use")
 	set.StringVar(&turnServer, "turn", "", "TURN server to use for relaying")
 	set.StringVar(&turnSecret, "turn-secret", "", "secret for HMAC-based authentication in TURN server")
 	set.Parse(args[1:])
@@ -356,7 +356,7 @@ func signallingServerCmd(args ...string) {
 		log.Fatal("cannot use a TURN server without a secret")
 	}
 
-	for _, s := range strings.Split(*stunservers, ",") {
+	for _, s := range strings.Split(*stun, ",") {
 		if s == "" {
 			continue
 		}
@@ -393,7 +393,7 @@ func signallingServerCmd(args ...string) {
 		w.Header().Set("Cache-Control", "no-cache")
 
 		// Set HSTS header for 2 years on HTTPS connections.
-		if *httpsaddr != "" {
+		if *httpsAddr != "" {
 			w.Header().Set("Strict-Transport-Security", "max-age=63072000")
 		}
 
@@ -415,7 +415,7 @@ func signallingServerCmd(args ...string) {
 	}
 
 	m := &autocert.Manager{
-		Cache:      autocert.DirCache(*secretpath),
+		Cache:      autocert.DirCache(*secretPath),
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(strings.Split(*hosts, ",")...),
 	}
@@ -424,7 +424,7 @@ func signallingServerCmd(args ...string) {
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 60 * time.Minute,
 		IdleTimeout:  20 * time.Second,
-		Addr:         *httpsaddr,
+		Addr:         *httpsAddr,
 		Handler:      http.HandlerFunc(handler),
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS12,
@@ -442,7 +442,7 @@ func signallingServerCmd(args ...string) {
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 60 * time.Minute,
 		IdleTimeout:  20 * time.Second,
-		Addr:         *httpaddr,
+		Addr:         *httpAddr,
 		Handler:      m.HTTPHandler(http.HandlerFunc(handler)),
 	}
 
@@ -451,15 +451,15 @@ func signallingServerCmd(args ...string) {
 	}
 
 	errc := make(chan error)
-	if *debugaddr != "" {
+	if *debugAddr != "" {
 		http.Handle("/metrics", promhttp.Handler())
-		go func() { errc <- http.ListenAndServe(*debugaddr, nil) }()
+		go func() { errc <- http.ListenAndServe(*debugAddr, nil) }()
 	}
-	if *httpsaddr != "" {
+	if *httpsAddr != "" {
 		srv.Handler = m.HTTPHandler(nil) // Enable redirect to https handler.
 		go func() { errc <- ssrv.ListenAndServeTLS(*cert, *key) }()
 	}
-	if *httpaddr != "" {
+	if *httpAddr != "" {
 		go func() { errc <- srv.ListenAndServe() }()
 	}
 	log.Fatal(<-errc)

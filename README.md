@@ -119,7 +119,7 @@ the PAKE?
 	signalling server at all. There's also a mobile app version
 	in the works.
 
-	The web version hosted on webwormhole.io exists as a middle
+	The web version hosted on gowormhole.d5k.co exists as a middle
 	ground between convenience and security. Like any other
 	website you visit, you do have to trust it's not running
 	any malicious code in your browser.

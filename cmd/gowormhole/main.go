@@ -34,7 +34,7 @@ var (
 var stderr = flag.CommandLine.Output()
 
 func usage() {
-	fmt.Fprintf(stderr, "webwormhole creates ephemeral pipes between computers.\n\n")
+	fmt.Fprintf(stderr, "gowormhole creates ephemeral pipes between computers.\n\n")
 	fmt.Fprintf(stderr, "usage:\n\n")
 	fmt.Fprintf(stderr, "  %s [flags] <command> [arguments]\n\n", os.Args[0])
 	fmt.Fprintf(stderr, "commands:\n")
