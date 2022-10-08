@@ -43,6 +43,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bingoohuang/gowormhole/internal/util"
+
 	"filippo.io/cpace"
 	webrtc "github.com/pion/webrtc/v3"
 	"golang.org/x/crypto/hkdf"
@@ -99,8 +101,7 @@ var (
 	// version of the signalling protocol.
 	ErrBadVersion = errors.New("bad version")
 
-	// ErrBadVersion is returned when the the peer on the same slot uses a different
-	// password.
+	// ErrBadKey is returned when the peer on the same slot uses a different password.
 	ErrBadKey = errors.New("bad key")
 
 	// ErrNoSuchSlot indicates no one is on the slot requested.
@@ -153,7 +154,7 @@ func (c *Wormhole) Write(p []byte) (n int, err error) {
 	return c.rwc.Write(p)
 }
 
-// Read read a message from the default DataChannel.
+// Read a message from the default DataChannel.
 func (c *Wormhole) Read(p []byte) (n int, err error) {
 	return c.rwc.Read(p)
 }
@@ -221,7 +222,7 @@ func readEncJSON(ws *websocket.Conn, key *[32]byte, v interface{}) error {
 }
 
 func writeEncJSON(ws *websocket.Conn, key *[32]byte, v interface{}) error {
-	jsonmsg, err := json.Marshal(v)
+	j, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
@@ -229,11 +230,9 @@ func writeEncJSON(ws *websocket.Conn, key *[32]byte, v interface{}) error {
 	if _, err := io.ReadFull(crand.Reader, nonce[:]); err != nil {
 		return err
 	}
-	return ws.Write(
-		context.TODO(),
-		websocket.MessageText,
+	return ws.Write(context.TODO(), websocket.MessageText,
 		[]byte(base64.URLEncoding.EncodeToString(
-			secretbox.Seal(nonce[:], jsonmsg, &nonce, key),
+			secretbox.Seal(nonce[:], j, &nonce, key),
 		)),
 	)
 }
@@ -247,9 +246,7 @@ func readBase64(ws *websocket.Conn) ([]byte, error) {
 }
 
 func writeBase64(ws *websocket.Conn, p []byte) error {
-	return ws.Write(
-		context.TODO(),
-		websocket.MessageText,
+	return ws.Write(context.TODO(), websocket.MessageText,
 		[]byte(base64.URLEncoding.EncodeToString(p)),
 	)
 }
@@ -375,11 +372,8 @@ func New(pass string, sigserv string, slotc chan string) (*Wormhole, error) {
 	if err != nil {
 		return nil, err
 	}
-	if u.Scheme == "http" || u.Scheme == "ws" {
-		u.Scheme = "ws"
-	} else {
-		u.Scheme = "wss"
-	}
+	u.Scheme = util.If(u.Scheme == "http" || u.Scheme == "ws", "ws", "wss")
+
 	wsaddr := u.String()
 
 	ws, _, err := websocket.Dial(context.TODO(), wsaddr, &websocket.DialOptions{
@@ -473,16 +467,13 @@ func New(pass string, sigserv string, slotc chan string) (*Wormhole, error) {
 	case <-c.opened:
 		relay := c.IsRelay()
 		logf("webrtc connection succeeded (relay: %v) closing signalling channel", relay)
-		if relay {
-			ws.Close(CloseWebRTCSuccessRelay, "")
-		} else {
-			ws.Close(CloseWebRTCSuccessDirect, "")
-		}
+		_ = ws.Close(util.If[websocket.StatusCode](relay, CloseWebRTCSuccessRelay, CloseWebRTCSuccessDirect), "")
+
 	case err = <-c.err:
-		ws.Close(CloseWebRTCFailed, "")
+		_ = ws.Close(CloseWebRTCFailed, "")
 	case <-time.After(30 * time.Second):
 		err = ErrTimedOut
-		ws.Close(CloseWebRTCFailed, "timed out")
+		_ = ws.Close(CloseWebRTCFailed, "timed out")
 	}
 	return c, err
 }
@@ -576,7 +567,7 @@ func Join(slot, pass string, sigserv string) (*Wormhole, error) {
 	err = readEncJSON(ws, &key, &offer)
 	if err == ErrBadKey {
 		// Close with the right status so the other side knows to quit immediately.
-		ws.Close(CloseBadKey, "bad key")
+		_ = ws.Close(CloseBadKey, "bad key")
 		return nil, err
 	}
 	if err != nil {
@@ -623,16 +614,13 @@ func Join(slot, pass string, sigserv string) (*Wormhole, error) {
 	case <-c.opened:
 		relay := c.IsRelay()
 		logf("webrtc connection succeeded (relay: %v) closing signalling channel", relay)
-		if relay {
-			ws.Close(CloseWebRTCSuccessRelay, "")
-		} else {
-			ws.Close(CloseWebRTCSuccessDirect, "")
-		}
+		_ = ws.Close(util.If[websocket.StatusCode](relay, CloseWebRTCSuccessRelay, CloseWebRTCSuccessDirect), "")
+
 	case err = <-c.err:
-		ws.Close(CloseWebRTCFailed, "")
+		_ = ws.Close(CloseWebRTCFailed, "")
 	case <-time.After(30 * time.Second):
 		err = ErrTimedOut
-		ws.Close(CloseWebRTCFailed, "timed out")
+		_ = ws.Close(CloseWebRTCFailed, "timed out")
 	}
 	return c, err
 }
