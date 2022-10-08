@@ -354,7 +354,10 @@ func signallingServerCmd(args ...string) {
 	secretPath := set.String("secrets", os.Getenv("HOME")+"/keys", "path to put let's encrypt cache")
 	cert := set.String("cert", "", "https certificate (leave empty to use letsencrypt)")
 	key := set.String("key", "", "https certificate key")
-	stun := set.String("stun", "stun:gowormhole.d5k.co", "list of STUN server addresses to tell clients to use")
+
+	// mondain/public-stun-list.txt https://gist.github.com/mondain/b0ec1cf5f60ae726202e
+	// https://github.com/pradt2/always-online-stun
+	stun := set.String("stun", "stun:stun2.l.google.com:19302", "list of STUN server addresses to tell clients to use")
 	set.StringVar(&turnServer, "turn", "", "TURN server to use for relaying")
 	set.StringVar(&turnSecret, "turn-secret", "", "secret for HMAC-based authentication in TURN server")
 	_ = set.Parse(args[1:])
