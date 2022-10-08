@@ -13,6 +13,7 @@ import (
 
 	"github.com/bingoohuang/gg/pkg/v"
 
+	"github.com/atotto/clipboard"
 	"github.com/bingoohuang/gowormhole/wordlist"
 	"github.com/bingoohuang/gowormhole/wormhole"
 )
@@ -97,7 +98,9 @@ func newConn(code string, length int) *wormhole.Wormhole {
 		s := <-slotc
 		slot, err := strconv.Atoi(s)
 		util.FatalfIf(err != nil, "got invalid slot from signalling server: %v", s)
-		util.PrintQRCode(sigserv, wordlist.Encode(slot, pass))
+		word := wordlist.Encode(slot, pass)
+		clipboard.WriteAll(word)
+		util.PrintQRCode(sigserv, word)
 	}()
 	c, err := wormhole.New(string(pass), sigserv, slotc)
 	util.FatalfIf(err == wormhole.ErrBadVersion,

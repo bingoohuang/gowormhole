@@ -5,6 +5,7 @@ go 1.19
 require (
 	filippo.io/cpace v0.0.0-20210101143347-24d601e2e469
 	github.com/NYTimes/gziphandler v1.1.1
+	github.com/atotto/clipboard v0.1.4
 	github.com/bingoohuang/gg v0.0.0-20220831035257-ad15de24a5eb
 	github.com/cheggaaa/pb/v3 v3.1.0
 	github.com/pion/logging v0.2.2

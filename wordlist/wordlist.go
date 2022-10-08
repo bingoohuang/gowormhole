@@ -21,7 +21,7 @@ func Encode(slot int, pass []byte) string {
 	return defaultEncodings[0].Encode(slot, pass)
 }
 
-// Encode returns the slot and pass encoded by code, trying all supported word lists
+// Decode returns the slot and pass encoded by code, trying all supported word lists
 // supported in the default order. Invalid codes return a 0 slot and a nil pass.
 func Decode(code string) (slot int, pass []byte) {
 	for _, enc := range defaultEncodings {
@@ -49,7 +49,7 @@ func Match(prefix string) string {
 type encoding interface {
 	// Encode returns the string encoding of slot and pass.
 	Encode(slot int, pass []byte) string
-	// Encode returns the slot and pass encoded by code.
+	// Decode returns the slot and pass encoded by code.
 	Decode(code string) (slot int, pass []byte)
 	// Match returns the first word in the word list that has prefix prefix.
 	Match(prefix string) string
