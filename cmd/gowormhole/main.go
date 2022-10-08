@@ -89,9 +89,9 @@ func newConn(code string, length int) *wormhole.Wormhole {
 	}
 	// New wormhole.
 	pass := make([]byte, length)
-	if _, err := io.ReadFull(crand.Reader, pass); err != nil {
-		util.Fatalf("could not generate password: %v", err)
-	}
+	_, err := io.ReadFull(crand.Reader, pass)
+	util.FatalfIf(err != nil, "could not generate password: %v", err)
+
 	slotc := make(chan string)
 	go func() {
 		s := <-slotc

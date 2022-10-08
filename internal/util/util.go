@@ -11,7 +11,7 @@ import (
 )
 
 func PrintQRCode(baseURL, code string) {
-	Fatalf("%s\n", code)
+	Printf("%s\n", code)
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return
@@ -22,46 +22,45 @@ func PrintQRCode(baseURL, code string) {
 		return
 	}
 	for x := 0; x < qrcode.Size; x++ {
-		Fatalf("█")
+		Printf("█")
 	}
-	Fatalf("████████\n")
+	Printf("████████\n")
 	for x := 0; x < qrcode.Size; x++ {
-		Fatalf("█")
+		Printf("█")
 	}
-	Fatalf("████████\n")
+	Printf("████████\n")
 	for y := 0; y < qrcode.Size; y += 2 {
-		Fatalf("████")
+		Printf("████")
 		for x := 0; x < qrcode.Size; x++ {
 			switch {
 			case qrcode.Black(x, y) && qrcode.Black(x, y+1):
-				Fatalf(" ")
+				Printf(" ")
 			case qrcode.Black(x, y):
-				Fatalf("▄")
+				Printf("▄")
 			case qrcode.Black(x, y+1):
-				Fatalf("▀")
+				Printf("▀")
 			default:
-				Fatalf("█")
+				Printf("█")
 			}
 		}
-		Fatalf("████\n")
+		Printf("████\n")
 	}
 	for x := 0; x < qrcode.Size; x++ {
-		Fatalf("█")
+		Printf("█")
 	}
-	Fatalf("████████\n")
+	Printf("████████\n")
 	for x := 0; x < qrcode.Size; x++ {
-		Fatalf("█")
+		Printf("█")
 	}
-	Fatalf("████████\n")
-	Fatalf("%s\n", u.String())
+	Printf("████████\n")
+	Printf("%s\n", u.String())
 }
 
 func LookupEnvOrBool(key string, defaultVal bool) bool {
 	if v, ok := os.LookupEnv(key); ok {
 		val, err := strconv.ParseBool(v)
-		if err != nil {
-			Fatalf("Cannot parse envvar: %s: %v", v, err)
-		}
+		FatalfIf(err != nil, "Cannot parse envvar: %s: %v", v, err)
+
 		return val
 	}
 	return defaultVal
