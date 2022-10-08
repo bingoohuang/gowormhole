@@ -94,12 +94,6 @@ func init() {
 	prometheus.MustRegister(slotsGuage)
 }
 
-// slots is a map of allocated slot numbers.
-var slots = struct {
-	m map[string]chan *websocket.Conn
-	sync.RWMutex
-}{m: make(map[string]chan *websocket.Conn)}
-
 // turnSecret, turnServer, and stunServers are used to generate ICE config
 // and send it to clients as soon as they connect.
 var turnSecret string
@@ -109,34 +103,80 @@ var (
 	stunServers []webrtc.ICEServer
 )
 
-// freeslot tries to find an available numeric slot, favouring smaller numbers.
+type Slots struct {
+	m    map[string]chan *websocket.Conn
+	lock sync.RWMutex
+}
+
+func (r *Slots) Delete(slotKey string) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	delete(r.m, slotKey)
+	slotsGuage.Set(float64(len(r.m)))
+}
+
+// slots is a map of allocated slot numbers.
+var slots = Slots{m: make(map[string]chan *websocket.Conn)}
+
+func (r *Slots) GetAndDelete(slotKey string) (sc chan *websocket.Conn, ok bool) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	sc, ok = r.m[slotKey]
+	if !ok {
+		rendezvousCounter.WithLabelValues("nosuchslot").Inc()
+		return
+	}
+	delete(r.m, slotKey)
+	slotsGuage.Set(float64(len(slots.m)))
+	return
+}
+func (r *Slots) FreeSlot() (slotKey string, sc chan *websocket.Conn, ok bool) {
+	// Book a new slot.
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	newslot, ok := r.free()
+	if !ok {
+		rendezvousCounter.WithLabelValues("nomoreslots").Inc()
+		return
+	}
+	slotKey = newslot
+	sc = make(chan *websocket.Conn)
+	r.m[newslot] = sc
+	slotsGuage.Set(float64(len(r.m)))
+	return
+}
+
+// free tries to find an available numeric slot, favouring smaller numbers.
 // This assumes slots is locked.
-func freeslot() (slot string, ok bool) {
+func (r *Slots) free() (slot string, ok bool) {
 	// Assuming varint encoding, we first try for one byte. That's 7 bits in varint.
 	for i := 0; i < 64; i++ {
 		s := strconv.Itoa(rand.Intn(1 << 7))
-		if _, ok := slots.m[s]; !ok {
+		if _, ok := r.m[s]; !ok {
 			return s, true
 		}
 	}
 	// Then try for two bytes. 11 bits.
 	for i := 0; i < 1024; i++ {
 		s := strconv.Itoa(rand.Intn(1 << 11))
-		if _, ok := slots.m[s]; !ok {
+		if _, ok := r.m[s]; !ok {
 			return s, true
 		}
 	}
 	// Then try for three bytes. 16 bits.
 	for i := 0; i < 2048; i++ {
 		s := strconv.Itoa(rand.Intn(1 << 16))
-		if _, ok := slots.m[s]; !ok {
+		if _, ok := r.m[s]; !ok {
 			return s, true
 		}
 	}
 	// Then try for four bytes. 21 bits.
 	for i := 0; i < 2048; i++ {
 		s := strconv.Itoa(rand.Intn(1 << 21))
-		if _, ok := slots.m[s]; !ok {
+		if _, ok := r.m[s]; !ok {
 			return s, true
 		}
 	}
@@ -161,8 +201,8 @@ func turnServers() []webrtc.ICEServer {
 	}}
 }
 
-// relay sets up a rendezvous on a slot and pipes the two websockets together.
-func relay(w http.ResponseWriter, r *http.Request) {
+// signalling sets up a rendezvous on a slot and pipes the two websockets together.
+func signalling(w http.ResponseWriter, r *http.Request) {
 	slotkey := r.URL.Path[1:] // strip leading slash
 	var rconn *websocket.Conn
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
@@ -180,7 +220,7 @@ func relay(w http.ResponseWriter, r *http.Request) {
 		// Make sure we negotiated the right protocol, since "blank" is also a
 		// default one.
 		protocolErrorCounter.WithLabelValues("wrongversion").Inc()
-		conn.Close(wormhole.CloseWrongProto, "wrong protocol, please upgrade client")
+		_ = conn.Close(wormhole.CloseWrongProto, "wrong protocol, please upgrade client")
 		return
 	}
 
@@ -195,36 +235,24 @@ func relay(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		if slotkey == "" {
 			// Book a new slot.
-			slots.Lock()
-			newslot, ok := freeslot()
+			newslot, c, ok := slots.FreeSlot()
 			if !ok {
-				slots.Unlock()
-				rendezvousCounter.WithLabelValues("nomoreslots").Inc()
-				conn.Close(wormhole.CloseNoMoreSlots, "cannot allocate slots")
+				_ = conn.Close(wormhole.CloseNoMoreSlots, "cannot allocate slots")
 				return
 			}
 			slotkey = newslot
-			sc := make(chan *websocket.Conn)
-			slots.m[slotkey] = sc
-			slotsGuage.Set(float64(len(slots.m)))
-			slots.Unlock()
+			sc := c
 			initmsg.Slot = slotkey
 			buf, err := json.Marshal(initmsg)
 			if err != nil {
 				log.Println(err)
-				slots.Lock()
-				delete(slots.m, slotkey)
-				slotsGuage.Set(float64(len(slots.m)))
-				slots.Unlock()
+				slots.Delete(slotkey)
 				return
 			}
 			err = conn.Write(ctx, websocket.MessageText, buf)
 			if err != nil {
 				log.Println(err)
-				slots.Lock()
-				delete(slots.m, slotkey)
-				slotsGuage.Set(float64(len(slots.m)))
-				slots.Unlock()
+				slots.Delete(slotkey)
 				return
 			}
 
@@ -233,15 +261,12 @@ func relay(w http.ResponseWriter, r *http.Request) {
 				select {
 				case <-ctx.Done():
 					rendezvousCounter.WithLabelValues("timeout").Inc()
-					slots.Lock()
-					delete(slots.m, slotkey)
-					slotsGuage.Set(float64(len(slots.m)))
-					slots.Unlock()
-					conn.Close(wormhole.CloseSlotTimedOut, "timed out")
+					slots.Delete(slotkey)
+					_ = conn.Close(wormhole.CloseSlotTimedOut, "timed out")
 					return
 				case <-time.After(30 * time.Second):
 					// Do a WebSocket Ping every 30 seconds.
-					conn.Ping(ctx)
+					_ = conn.Ping(ctx)
 				case sc <- conn:
 					break wait
 				}
@@ -252,17 +277,11 @@ func relay(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Join an existing slot.
-		slots.Lock()
-		sc, ok := slots.m[slotkey]
+		sc, ok := slots.GetAndDelete(slotkey)
 		if !ok {
-			slots.Unlock()
-			rendezvousCounter.WithLabelValues("nosuchslot").Inc()
-			conn.Close(wormhole.CloseNoSuchSlot, "no such slot")
+			_ = conn.Close(wormhole.CloseNoSuchSlot, "no such slot")
 			return
 		}
-		delete(slots.m, slotkey)
-		slotsGuage.Set(float64(len(slots.m)))
-		slots.Unlock()
 		initmsg.Slot = slotkey
 		buf, err := json.Marshal(initmsg)
 		if err != nil {
@@ -276,7 +295,7 @@ func relay(w http.ResponseWriter, r *http.Request) {
 		}
 		select {
 		case <-ctx.Done():
-			conn.Close(wormhole.CloseSlotTimedOut, "timed out")
+			_ = conn.Close(wormhole.CloseSlotTimedOut, "timed out")
 		case rconn = <-sc:
 		}
 		sc <- conn
@@ -290,7 +309,7 @@ func relay(w http.ResponseWriter, r *http.Request) {
 		case wormhole.CloseBadKey:
 			iceCounter.WithLabelValues("fail", "badkey").Inc()
 			if rconn != nil {
-				rconn.Close(wormhole.CloseBadKey, "bad key")
+				_ = rconn.Close(wormhole.CloseBadKey, "bad key")
 			}
 			return
 		case wormhole.CloseWebRTCFailed:
@@ -307,9 +326,11 @@ func relay(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
+			log.Printf("read error: %v", err)
+
 			iceCounter.WithLabelValues("unknown", "unknown").Inc()
 			if rconn != nil {
-				rconn.Close(wormhole.ClosePeerHungUp, "peer hung up")
+				_ = rconn.Close(wormhole.ClosePeerHungUp, "peer hung up")
 			}
 			return
 		}
@@ -319,8 +340,8 @@ func relay(w http.ResponseWriter, r *http.Request) {
 			// so we should just bail out.
 			return
 		}
-		err = rconn.Write(ctx, msgType, p)
-		if err != nil {
+		if err := rconn.Write(ctx, msgType, p); err != nil {
+			log.Printf("write error: %v", err)
 			return
 		}
 	}
@@ -331,9 +352,9 @@ func signallingServerCmd(args ...string) {
 
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
-		fmt.Fprintf(set.Output(), "run the gowormhole signalling server\n\n")
-		fmt.Fprintf(set.Output(), "usage: %s %s\n\n", os.Args[0], args[0])
-		fmt.Fprintf(set.Output(), "flags:\n")
+		_, _ = fmt.Fprintf(set.Output(), "run the gowormhole signalling server\n\n")
+		_, _ = fmt.Fprintf(set.Output(), "usage: %s %s\n\n", os.Args[0], args[0])
+		_, _ = fmt.Fprintf(set.Output(), "flags:\n")
 		set.PrintDefaults()
 	}
 	httpAddr := set.String("http", ":http", "http listen address")
@@ -346,7 +367,7 @@ func signallingServerCmd(args ...string) {
 	stun := set.String("stun", "stun:relay.webwormhole.io", "list of STUN server addresses to tell clients to use")
 	set.StringVar(&turnServer, "turn", "", "TURN server to use for relaying")
 	set.StringVar(&turnSecret, "turn-secret", "", "secret for HMAC-based authentication in TURN server")
-	set.Parse(args[1:])
+	_ = set.Parse(args[1:])
 
 	if (*cert == "") != (*key == "") {
 		log.Fatalf("-cert and -key options must be provided together or both left empty")
@@ -366,7 +387,7 @@ func signallingServerCmd(args ...string) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		// Handle WebSocket connections.
 		if strings.ToLower(r.Header.Get("Upgrade")) == "websocket" {
-			relay(w, r)
+			signalling(w, r)
 			return
 		}
 
@@ -398,7 +419,7 @@ func signallingServerCmd(args ...string) {
 
 		// Return a redirect to source code repo for the go get URL.
 		if r.URL.Query().Get("go-get") == "1" || r.URL.Path == "/cmd/gowormhole" {
-			w.Write([]byte(importMeta))
+			_, _ = w.Write([]byte(importMeta))
 			return
 		}
 
