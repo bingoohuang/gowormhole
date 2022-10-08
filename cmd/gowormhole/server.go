@@ -357,10 +357,9 @@ func signallingServerCmd(args ...string) {
 	}
 
 	for _, s := range strings.Split(*stun, ",") {
-		if s == "" {
-			continue
+		if s != "" {
+			stunServers = append(stunServers, webrtc.ICEServer{URLs: []string{s}})
 		}
-		stunServers = append(stunServers, webrtc.ICEServer{URLs: []string{s}})
 	}
 
 	fs := gziphandler.GzipHandler(http.FileServer(http.FS(gowormhole.Web)))
