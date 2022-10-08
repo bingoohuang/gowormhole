@@ -146,3 +146,5 @@ the PAKE?
     - [Live Demo](https://www.webrtc-experiment.com/FileBufferReader/)
     - [Github (open-sourced)](https://github.com/muaz-khan/FileBufferReader)
     - [Youtube video presentation](https://www.youtube.com/watch?v=gv8xpdGdS4o)
+
+3. [psanford/wormhole-william](https://github.com/psanford/wormhole-william), End-to-end encrypted file transfer. A magic wormhole CLI and API in Go (golang).

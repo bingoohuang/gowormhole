@@ -13,7 +13,7 @@
 //
 // The protocol requires a signalling server that facilitates exchanging
 // arbitrary messages via a slot system. The server subcommand of the
-// ww tool is an implementation of this over WebSockets.
+// gowormhole tool is an implementation of this over WebSockets.
 //
 // Rough sketch of the handshake:
 //

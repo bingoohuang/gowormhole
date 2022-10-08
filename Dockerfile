@@ -9,11 +9,11 @@ RUN go mod download
 COPY . /src
 RUN GOOS=js GOARCH=wasm go build -o ./web/webwormhole.wasm ./web
 RUN cp $(go env GOROOT)/misc/wasm/wasm_exec.js ./web/wasm_exec.js
-RUN go build ./cmd/ww
+RUN go build ./cmd/gowormhole
 
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
-COPY --from=gobuild /src/ww /bin
-COPY --from=gobuild /src/web /web
+COPY --from=gobuild gowormhole /bin
+#COPY --from=gobuild /src/web /web
 WORKDIR /
-ENTRYPOINT ["/bin/ww", "server"]
+ENTRYPOINT ["/bin/gowormhole", "server"]

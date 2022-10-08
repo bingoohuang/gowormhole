@@ -1,4 +1,4 @@
-// Command ww moves files and other data over WebRTC.
+// Command gowormhole moves files and other data over WebRTC.
 package main
 
 import (
@@ -122,7 +122,7 @@ func newConn(code string, length int) *wormhole.Wormhole {
 			"%s%s%s",
 			"the signalling server is running an incompatable version.\n",
 			"try upgrading the client:\n\n",
-			"    go get github.com/bingoohuang/gowormhole/cmd/ww\n",
+			"    go get github.com/bingoohuang/gowormhole/cmd/gowormhole\n",
 		)
 	}
 	if err != nil {

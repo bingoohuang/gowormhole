@@ -56,7 +56,7 @@ work, please file a bug report.
 var (
 	rendezvousCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "ww",
+			Namespace: "gowormhole",
 			Name:      "rendezvous_attempts",
 			Help:      "Number of attempts to rendezvous using the signalling server.",
 		},
@@ -64,7 +64,7 @@ var (
 	)
 	iceCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "ww",
+			Namespace: "gowormhole",
 			Name:      "webrtc_attempts",
 			Help:      "Number of reported ICE results sliced by ICE method used.",
 		},
@@ -72,7 +72,7 @@ var (
 	)
 	protocolErrorCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "ww",
+			Namespace: "gowormhole",
 			Name:      "protocol_errors",
 			Help:      "Number of bad requests to the signalling server.",
 		},
@@ -80,7 +80,7 @@ var (
 	)
 	slotsGuage = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: "ww",
+			Namespace: "gowormhole",
 			Name:      "busy_slots",
 			Help:      "Number of currently busy slots.",
 		},
@@ -110,7 +110,7 @@ var (
 )
 
 // freeslot tries to find an available numeric slot, favouring smaller numbers.
-// This assume slots is locked.
+// This assumes slots is locked.
 func freeslot() (slot string, ok bool) {
 	// Assuming varint encoding, we first try for one byte. That's 7 bits in varint.
 	for i := 0; i < 64; i++ {
@@ -398,7 +398,7 @@ func signallingServerCmd(args ...string) {
 		}
 
 		// Return a redirect to source code repo for the go get URL.
-		if r.URL.Query().Get("go-get") == "1" || r.URL.Path == "/cmd/ww" {
+		if r.URL.Query().Get("go-get") == "1" || r.URL.Path == "/cmd/gowormhole" {
 			w.Write([]byte(importMeta))
 			return
 		}
