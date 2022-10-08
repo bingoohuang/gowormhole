@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/bingoohuang/gowormhole/internal/util"
 )
 
 func pipeSubCmd(args ...string) {
@@ -28,17 +30,15 @@ func pipeSubCmd(args ...string) {
 	// The recieve end of the pipe.
 	go func() {
 		_, err := io.CopyBuffer(os.Stdout, c, make([]byte, msgChunkSize))
-		if err != nil {
-			fatalf("could not write to stdout: %v", err)
-		}
+		util.FatalfIf(err != nil, "could not write to stdout: %v", err)
+
 		done <- struct{}{}
 	}()
 	// The send end of the pipe.
 	go func() {
 		_, err := io.CopyBuffer(c, os.Stdin, make([]byte, msgChunkSize))
-		if err != nil {
-			fatalf("could not write to channel: %v", err)
-		}
+		util.FatalfIf(err != nil, "could not write to channel: %v", err)
+
 		done <- struct{}{}
 	}()
 	<-done

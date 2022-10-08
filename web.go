@@ -1,3 +1,4 @@
+// Package gowormhole  provides some helpful utilities.
 package gowormhole
 
 import (

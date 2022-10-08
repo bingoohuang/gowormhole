@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/bingoohuang/gowormhole/internal/util"
+
 	"github.com/cheggaaa/pb/v3"
 )
 
@@ -50,19 +52,15 @@ func receiveSubCmd(args ...string) {
 		if err == io.EOF {
 			break
 		}
-		if err != nil {
-			fatalf("could not read file header: %v", err)
-		}
+		util.FatalfIf(err != nil, "could not read file header: %v", err)
+
 		var h header
 		err = json.Unmarshal(buf[:n], &h)
-		if err != nil {
-			fatalf("could not decode file header: %v", err)
-		}
+		util.FatalfIf(err != nil, "could not decode file header: %v", err)
 
 		f, err := os.Create(filepath.Join(*directory, filepath.Clean(h.Name)))
-		if err != nil {
-			fatalf("could not create output file %s: %v", h.Name, err)
-		}
+		util.FatalfIf(err != nil, "could not create output file %s: %v", h.Name, err)
+
 		_, _ = fmt.Fprintf(set.Output(), "receiving %v... ", h.Name)
 
 		reader := io.LimitReader(c, int64(h.Size))
@@ -72,12 +70,10 @@ func receiveSubCmd(args ...string) {
 
 		written, err := io.CopyBuffer(f, barReader, make([]byte, msgChunkSize))
 		bar.Finish() // finish bar
+		util.FatalfIf(err != nil, "\ncould not save file: %v", err)
 
-		if err != nil {
-			fatalf("\ncould not save file: %v", err)
-		}
 		if written != int64(h.Size) {
-			fatalf("\nEOF before receiving all bytes: (%d/%d)", written, h.Size)
+			util.Fatalf("\nEOF before receiving all bytes: (%d/%d)", written, h.Size)
 		}
 		_ = f.Close()
 		_, _ = fmt.Fprintf(set.Output(), "done\n")
@@ -105,23 +101,21 @@ func sendSubCmd(args ...string) {
 
 	for _, filename := range set.Args() {
 		f, err := os.Open(filename)
-		if err != nil {
-			fatalf("could not open file %s: %v", filename, err)
-		}
+		util.FatalfIf(err != nil, "could not open file %s: %v", filename, err)
+
 		info, err := f.Stat()
-		if err != nil {
-			fatalf("could not stat file %s: %v", filename, err)
-		}
+		util.FatalfIf(err != nil, "could not stat file %s: %v", filename, err)
+
 		h, err := json.Marshal(header{
 			Name: filepath.Base(filepath.Clean(filename)),
 			Size: int(info.Size()),
 		})
 		if err != nil {
-			fatalf("failed to marshal json: %v", err)
+			util.Fatalf("failed to marshal json: %v", err)
 		}
 		_, err = c.Write(h)
 		if err != nil {
-			fatalf("could not send file header: %v", err)
+			util.Fatalf("could not send file header: %v", err)
 		}
 		_, _ = fmt.Fprintf(set.Output(), "sending %v... ", filepath.Base(filepath.Clean(filename)))
 
@@ -130,12 +124,10 @@ func sendSubCmd(args ...string) {
 
 		written, err := io.CopyBuffer(barWriter, f, make([]byte, msgChunkSize))
 		bar.Finish() // finish bar
+		util.FatalfIf(err != nil, "\ncould not send file: %v", err)
 
-		if err != nil {
-			fatalf("\ncould not send file: %v", err)
-		}
 		if written != info.Size() {
-			fatalf("\nEOF before sending all bytes: (%d/%d)", written, info.Size())
+			util.Fatalf("\nEOF before sending all bytes: (%d/%d)", written, info.Size())
 		}
 		_ = f.Close()
 		_, _ = fmt.Fprintf(set.Output(), "done\n")
