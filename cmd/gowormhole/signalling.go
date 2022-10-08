@@ -132,6 +132,7 @@ func (r *Slots) GetAndDelete(slotKey string) (sc chan *websocket.Conn, ok bool) 
 	slotsGuage.Set(float64(len(slots.m)))
 	return
 }
+
 func (r *Slots) FreeSlot() (slotKey string, sc chan *websocket.Conn, ok bool) {
 	// Book a new slot.
 	r.lock.Lock()
