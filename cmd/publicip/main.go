@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"time"
 
@@ -8,11 +9,14 @@ import (
 )
 
 func main() {
-	PrintPublicIP()
+	timemout := flag.Duration("timeout", 15*time.Second, "timeout")
+	flag.Parse()
+
+	PrintPublicIP(*timemout)
 }
 
-func PrintPublicIP() {
-	publicIP, err := DiscoverPublicIP()
+func PrintPublicIP(timeout time.Duration) {
+	publicIP, err := DiscoverPublicIP(timeout)
 	if err != nil {
 		fmt.Println(err)
 	} else {
@@ -21,7 +25,7 @@ func PrintPublicIP() {
 }
 
 // DiscoverPublicIP discovers public IP address of executed device by STUN server
-func DiscoverPublicIP() (string, error) {
+func DiscoverPublicIP(timeout time.Duration) (string, error) {
 	c, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{{
 			URLs: []string{"stun:stun.l.google.com:19302"},
@@ -53,7 +57,7 @@ func DiscoverPublicIP() (string, error) {
 	}
 
 	select {
-	case <-time.After(5 * time.Second):
+	case <-time.After(timeout):
 		return "", fmt.Errorf("timeout")
 	case IP := <-ch:
 		return IP, nil
