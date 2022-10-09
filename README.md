@@ -149,3 +149,4 @@ the PAKE?
 
 3. [psanford/wormhole-william](https://github.com/psanford/wormhole-william), End-to-end encrypted file transfer. A magic wormhole CLI and API in Go (golang).
 4. [pion/awesome-pion](https://github.com/pion/awesome-pion)
+5. [sharef](https://github.com/bingoohuang/sharef)
