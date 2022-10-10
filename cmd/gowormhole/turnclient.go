@@ -25,8 +25,8 @@ func turnClientSubCmd(args ...string) {
 
 	host := set.String("host", "127.0.0.1", "TURN Server name.")
 	port := set.Int("port", 3478, "Listening port.")
-	user := set.String("user", "scott=tiger", `A pair of username and password (e.g. "user=pass")`)
-	realm := set.String("realm", "pion.ly", `Realm (defaults to "pion.ly")`)
+	user := set.String("user", "scott:tiger", `A pair of username and password (e.g. "user:pass")`)
+	realm := set.String("realm", "d5k.ly", `Realm (defaults to "d5k.ly")`)
 	ping := set.Bool("ping", false, "Run ping test")
 	tcp := set.Bool("tcp", false, "Run ping test")
 	_ = set.Parse(args[1:])
@@ -37,7 +37,7 @@ func turnClientSubCmd(args ...string) {
 		log.Fatalf("'user' is required")
 	}
 
-	cred := strings.SplitN(*user, "=", 2)
+	cred := strings.SplitN(*user, ":", 2)
 	var conn net.PacketConn
 	var err error
 

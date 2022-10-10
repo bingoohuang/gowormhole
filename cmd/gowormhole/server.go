@@ -4,10 +4,7 @@ package main
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha1"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -94,11 +91,8 @@ func init() {
 	prometheus.MustRegister(slotsGuage)
 }
 
-// turnSecret, turnServer, and stunServers are used to generate ICE config
-// and send it to clients as soon as they connect.
-var turnSecret string
-
 var (
+	turnUser    string
 	turnServer  string
 	stunServers []webrtc.ICEServer
 )
@@ -192,13 +186,13 @@ func turnServers() []webrtc.ICEServer {
 	if turnServer == "" {
 		return nil
 	}
-	username := fmt.Sprintf("%d:wormhole", time.Now().Add(slotTimeout).Unix())
-	mac := hmac.New(sha1.New, []byte(turnSecret))
-	mac.Write([]byte(username))
+
+	userPass := strings.SplitN(turnUser, ":", 2)
+
 	return []webrtc.ICEServer{{
 		URLs:       []string{turnServer},
-		Username:   username,
-		Credential: base64.StdEncoding.EncodeToString(mac.Sum(nil)),
+		Username:   userPass[0],
+		Credential: userPass[1],
 	}}
 }
 
@@ -359,14 +353,14 @@ func signallingServerCmd(args ...string) {
 	// https://github.com/pradt2/always-online-stun
 	stun := set.String("stun", "stun:stun2.l.google.com:19302", "list of STUN server addresses to tell clients to use")
 	set.StringVar(&turnServer, "turn", "", "TURN server to use for relaying")
-	set.StringVar(&turnSecret, "turn-secret", "", "secret for HMAC-based authentication in TURN server")
+	set.StringVar(&turnUser, "turn-user", "", "turn user in TURN server, e.g. user:password")
 	_ = set.Parse(args[1:])
 
 	if (*cert == "") != (*key == "") {
 		log.Fatalf("-cert and -key options must be provided together or both left empty")
 	}
 
-	if turnServer != "" && turnSecret == "" {
+	if turnServer != "" && turnUser == "" {
 		log.Fatal("cannot use a TURN server without a secret")
 	}
 
