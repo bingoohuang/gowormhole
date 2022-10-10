@@ -19,6 +19,8 @@ import (
 )
 
 var subcmds = map[string]func(args ...string){
+	"publicip":    publicIPSubCmd,
+	"nat":         natSubCmd,
 	"send":        sendSubCmd,
 	"receive":     receiveSubCmd,
 	"pipe":        pipeSubCmd,

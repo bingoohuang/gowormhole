@@ -9,7 +9,7 @@ require (
 	github.com/bingoohuang/gg v0.0.0-20220831035257-ad15de24a5eb
 	github.com/cheggaaa/pb/v3 v3.1.0
 	github.com/pion/logging v0.2.2
-	github.com/pion/stun v0.3.5
+	github.com/pion/stun v0.3.6-0.20220524134636-7e647ef6201c
 	github.com/pion/turn/v2 v2.0.8
 	github.com/pion/webrtc/v3 v3.1.46
 	github.com/prometheus/client_golang v1.13.0
