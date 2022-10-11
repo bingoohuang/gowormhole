@@ -7,6 +7,8 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/atotto/clipboard v0.1.4
 	github.com/bingoohuang/gg v0.0.0-20220831035257-ad15de24a5eb
+	github.com/bingoohuang/godaemon v0.0.0-20220907040433-7f208f406639
+	github.com/bingoohuang/golog v0.0.0-20211112131923-101b7e1b3d4c
 	github.com/cheggaaa/pb/v3 v3.1.0
 	github.com/pion/logging v0.2.2
 	github.com/pion/stun v0.3.6-0.20220524134636-7e647ef6201c
@@ -27,6 +29,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
+	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.15-0.20210929170527-d423e9c6c3bf // indirect
@@ -45,10 +48,12 @@ require (
 	github.com/pion/srtp/v2 v2.0.10 // indirect
 	github.com/pion/transport v0.13.1 // indirect
 	github.com/pion/udp v0.1.1 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/sirupsen/logrus v1.8.1 // indirect
 	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect

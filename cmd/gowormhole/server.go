@@ -17,11 +17,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bingoohuang/golog"
+
 	"github.com/bingoohuang/gowormhole/internal/util"
 
 	"github.com/bingoohuang/gowormhole"
 
 	"github.com/NYTimes/gziphandler"
+	"github.com/bingoohuang/godaemon"
 	"github.com/bingoohuang/gowormhole/wormhole"
 	webrtc "github.com/pion/webrtc/v3"
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,19 +33,18 @@ import (
 	"nhooyr.io/websocket"
 )
 
-// slotTimeout is the maximum amount of time a client is allowed to
-// hold a slot.
-const slotTimeout = 12 * time.Hour
+const (
+	// slotTimeout is the maximum amount of time a client is allowed to hold a slot.
+	slotTimeout = 12 * time.Hour
 
-const importMeta = `<!doctype html>
+	importMeta = `<!doctype html>
 <meta charset=utf-8>
 <meta name="go-import" content="gowormhole.d5k.co git https://github.com/bingoohuang/gowormhole">
 <meta http-equiv="refresh" content="0;URL='https://github.com/bingoohuang/gowormhole'">
 `
+	serviceWorkerPage = `You're not supposed to get this file or end up here.
 
-const serviceWorkerPage = `You're not supposed to get this file or end up here.
-
-This is a dummy URL is used by WebWormhole to help web browsers
+This is a dummy URL is used by GobWormhole to help web browsers
 efficiently download files from a WebRTC connection. It should be
 handled entirely by a ServiceWorker running in your browser.
 
@@ -51,6 +53,7 @@ it is possible your web browser doesn't fully support ServiceWorkers
 but claims it does. Try a different web browser, and if that doesn't
 work, please file a bug report.
 `
+)
 
 var (
 	rendezvousCounter = prometheus.NewCounterVec(
@@ -336,27 +339,28 @@ func relay(w http.ResponseWriter, r *http.Request) {
 func signallingServerCmd(args ...string) {
 	rand.Seed(time.Now().UnixNano()) // for slot allocation
 
-	set := flag.NewFlagSet(args[0], flag.ExitOnError)
-	set.Usage = func() {
-		_, _ = fmt.Fprintf(set.Output(), "run the gowormhole signalling server\n\n")
-		_, _ = fmt.Fprintf(set.Output(), "usage: %s %s\n\n", os.Args[0], args[0])
-		_, _ = fmt.Fprintf(set.Output(), "flags:\n")
-		set.PrintDefaults()
+	f := flag.NewFlagSet(args[0], flag.ExitOnError)
+	f.Usage = func() {
+		_, _ = fmt.Fprintf(f.Output(), "run the gowormhole signalling server\n\n")
+		_, _ = fmt.Fprintf(f.Output(), "usage: %s %s\n\n", os.Args[0], args[0])
+		_, _ = fmt.Fprintf(f.Output(), "flags:\n")
+		f.PrintDefaults()
 	}
-	httpAddr := set.String("http", ":http", "http listen address")
-	httpsAddr := set.String("https", ":https", "https listen address")
-	debugAddr := set.String("debug", "", "debug and metrics listen address")
-	hosts := set.String("hosts", "", "comma separated list of hosts by which site is accessible")
-	secretPath := set.String("secrets", os.Getenv("HOME")+"/keys", "path to put let's encrypt cache")
-	cert := set.String("cert", "", "https certificate (leave empty to use letsencrypt)")
-	key := set.String("key", "", "https certificate key")
+	httpAddr := f.String("http", ":http", "http listen address")
+	httpsAddr := f.String("https", "", "https listen address")
+	debugAddr := f.String("debug", "", "debug and metrics listen address")
+	hosts := f.String("hosts", "", "comma separated list of hosts by which site is accessible")
+	secretPath := f.String("secrets", os.Getenv("HOME")+"/keys", "path to put let's encrypt cache")
+	cert := f.String("cert", "", "https certificate (leave empty to use letsencrypt)")
+	key := f.String("key", "", "https certificate key")
+	pDaemon := f.Bool("daemon", false, "Daemonized")
 
 	// mondain/public-stun-list.txt https://gist.github.com/mondain/b0ec1cf5f60ae726202e
 	// https://github.com/pradt2/always-online-stun
-	stun := set.String("stun", "stun2.l.google.com:19302", "list of STUN server addresses to tell clients to use")
-	set.StringVar(&turnServer, "turn", "", "TURN server to use for relaying")
-	set.StringVar(&turnUser, "turn-user", "", "turn user in TURN server, e.g. user:password")
-	_ = set.Parse(args[1:])
+	stun := f.String("stun", "stun2.l.google.com:19302", "list of STUN server addresses to tell clients to use")
+	f.StringVar(&turnServer, "turn", "", "TURN server to use for relaying")
+	f.StringVar(&turnUser, "turn-user", "", "turn user in TURN server, e.g. user:password")
+	_ = f.Parse(args[1:])
 
 	if (*cert == "") != (*key == "") {
 		log.Fatalf("-cert and -key options must be provided together or both left empty")
@@ -365,6 +369,14 @@ func signallingServerCmd(args ...string) {
 	if turnServer != "" && turnUser == "" {
 		log.Fatal("cannot use a TURN server without a secret")
 	}
+
+	if *pDaemon {
+		if p, _ := new(godaemon.Context).Reborn(); p != nil {
+			os.Exit(0)
+		}
+		log.Print("---  daemon started ---")
+	}
+	golog.Setup()
 
 	for _, s := range strings.Split(*stun, ",") {
 		if s != "" {
