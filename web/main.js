@@ -100,15 +100,6 @@ class Upload {
         }
         if (this.blob) {
             // Backwards compatability with browsers that don't have Blob.stream. (Safari pre-14.1)
-            function read(b) {
-                return new Promise((resolve) => {
-                    const fr = new FileReader();
-                    fr.onload = () => {
-                        resolve(new Uint8Array(fr.result));
-                    };
-                    fr.readAsArrayBuffer(b);
-                });
-            }
             const chunksize = 64 << 10;
             while (this.offset < this.header.size) {
                 let end = this.offset + chunksize;
@@ -123,6 +114,15 @@ class Upload {
             return;
         }
     }
+}
+function read(b) {
+    return new Promise((resolve) => {
+        const fr = new FileReader();
+        fr.onload = () => {
+            resolve(new Uint8Array(fr.result));
+        };
+        fr.readAsArrayBuffer(b);
+    });
 }
 class ServiceWorkerDownload {
     constructor(sw, header) {
@@ -418,7 +418,7 @@ async function connect() {
                 disconnected("datachannel closed");
             };
             dc.onerror = (e) => {
-                disconnected(`datachannel error: ${e.error}`);
+                disconnected(`datachannel error: ${e}`);
             };
         };
         const fingerprint = await w.dial();
@@ -433,8 +433,13 @@ async function connect() {
         document.body.style.backgroundColor = `var(--palette-${fingerprint[0] % 8})`;
     }
     catch (err) {
-        disconnected(err);
+        disconnected(getErrorMessage(err));
     }
+}
+function getErrorMessage(error) {
+    if (error instanceof Error)
+        return error.message;
+    return String(error);
 }
 function waiting() {
     infoBox.innerText =

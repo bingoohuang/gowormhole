@@ -74,23 +74,13 @@ func main() {
 
 func newConn(code string, length int) *wormhole.Wormhole {
 	if code != "" {
-		// Join wormhole.
-		slot, pass := wordlist.Decode(code)
-		util.FatalfIf(pass == nil, "could not decode password")
-
-		c, err := wormhole.Join(strconv.Itoa(slot), string(pass), sigserv)
-		util.FatalfIf(err == wormhole.ErrBadVersion,
-			"%s%s%s",
-			"the signalling server is running an incompatible version.\n",
-			"try upgrading the client:\n\n",
-			"    go get github.com/bingoohuang/gowormhole/cmd/gowormhole\n",
-		)
-
-		util.FatalfIf(err != nil, "could not dial: %v", err)
-		util.Printf("connected: %s\n", util.If(c.IsRelay(), "relay", "direct"))
-		return c
+		return joinWormhole(code)
 	}
-	// New wormhole.
+
+	return newWormhole(length)
+}
+
+func newWormhole(length int) *wormhole.Wormhole {
 	pass := make([]byte, length)
 	_, err := io.ReadFull(crand.Reader, pass)
 	util.FatalfIf(err != nil, "could not generate password: %v", err)
@@ -111,6 +101,20 @@ func newConn(code string, length int) *wormhole.Wormhole {
 		"try upgrading the client:\n\n",
 		"    go get github.com/bingoohuang/gowormhole/cmd/gowormhole\n",
 	)
+
+	util.FatalfIf(err != nil, "could not dial: %v", err)
+	util.Printf("connected: %s\n", util.If(c.IsRelay(), "relay", "direct"))
+	return c
+}
+
+func joinWormhole(code string) *wormhole.Wormhole {
+	slot, pass := wordlist.Decode(code)
+	util.FatalfIf(pass == nil, "could not decode password")
+
+	c, err := wormhole.Join(strconv.Itoa(slot), string(pass), sigserv)
+	util.FatalfIf(err == wormhole.ErrBadVersion,
+		`the signalling server is running in an incompatible version
+try upgrading the client: go get github.com/bingoohuang/gowormhole/cmd/gowormhole`)
 
 	util.FatalfIf(err != nil, "could not dial: %v", err)
 	util.Printf("connected: %s\n", util.If(c.IsRelay(), "relay", "direct"))

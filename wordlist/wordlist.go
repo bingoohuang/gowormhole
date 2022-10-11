@@ -109,6 +109,7 @@ func (list varintEncoding) Encode(slot int, pass []byte) string {
 	if len(pass) == 0 {
 		return ""
 	}
+
 	slotbytes := make([]byte, binary.MaxVarintLen64)
 	n := binary.PutUvarint(slotbytes, uint64(slot))
 	slotbytes = slotbytes[:n]
@@ -120,6 +121,7 @@ func (list varintEncoding) Encode(slot int, pass []byte) string {
 	for i := range pass {
 		words[n+i] = list[int(pass[i])*2+(n+i)%2]
 	}
+
 	return strings.Join(words, "-")
 }
 
@@ -132,7 +134,7 @@ func (list varintEncoding) Decode(code string) (slot int, pass []byte) {
 
 	buf := make([]byte, len(parts))
 	for i := range parts {
-		j := indexOf([]string(list), parts[i])
+		j := indexOf(list, parts[i])
 		if j < 0 {
 			return 0, nil
 		}

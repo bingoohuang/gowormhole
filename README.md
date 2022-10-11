@@ -150,3 +150,99 @@ the PAKE?
 3. [psanford/wormhole-william](https://github.com/psanford/wormhole-william), End-to-end encrypted file transfer. A magic wormhole CLI and API in Go (golang).
 4. [pion/awesome-pion](https://github.com/pion/awesome-pion)
 5. [sharef](https://github.com/bingoohuang/sharef)
+
+## NAT behaviour discovery
+
+`gowormhole nat`
+
+-  WARNING: 2022/10/11 08:44:56 => NAT mapping behavior: address and port dependent
+-  WARNING: 2022/10/11 08:45:03 => NAT filtering behavior: address and port dependent
+
+```log
+[root@fs01-192-168-126-182 bingoohuang]# gowormhole nat
+ INFO: 2022/10/11 08:44:56 connecting to STUN server: stun.voip.blackberry.com:3478
+ INFO: 2022/10/11 08:44:56 Local address: 0.0.0.0:58091
+ INFO: 2022/10/11 08:44:56 Remote address: 206.53.19.13:3478
+ INFO: 2022/10/11 08:44:56 Mapping Test I: Regular binding request
+ INFO: 2022/10/11 08:44:56 Sending to 206.53.19.13:3478: (20 bytes)
+ INFO: 2022/10/11 08:44:56 Response from 206.53.19.13:3478: (104 bytes)
+ INFO: 2022/10/11 08:44:56 Received XOR-MAPPED-ADDRESS: 223.7.19.28:2221
+ INFO: 2022/10/11 08:44:56 Mapping Test II: Send binding request to the other address but primary port
+ INFO: 2022/10/11 08:44:56 Sending to 206.53.19.13:3478: (20 bytes)
+ INFO: 2022/10/11 08:44:56 Response from 206.53.19.13:3478: (104 bytes)
+ INFO: 2022/10/11 08:44:56 Received XOR-MAPPED-ADDRESS: 223.7.19.28:2498
+ INFO: 2022/10/11 08:44:56 Mapping Test III: Send binding request to the other address and port
+ INFO: 2022/10/11 08:44:56 Sending to 206.53.19.13:3479: (20 bytes)
+ INFO: 2022/10/11 08:44:56 Response from 206.53.19.13:3479: (104 bytes)
+ INFO: 2022/10/11 08:44:56 Received XOR-MAPPED-ADDRESS: 223.7.19.28:2499
+ WARNING: 2022/10/11 08:44:56 => NAT mapping behavior: address and port dependent
+ INFO: 2022/10/11 08:44:56 connecting to STUN server: stun.voip.blackberry.com:3478
+ INFO: 2022/10/11 08:44:56 Local address: 0.0.0.0:60327
+ INFO: 2022/10/11 08:44:56 Remote address: 206.53.19.13:3478
+ INFO: 2022/10/11 08:44:56 Filtering Test I: Regular binding request
+ INFO: 2022/10/11 08:44:56 Sending to 206.53.19.13:3478: (20 bytes)
+ INFO: 2022/10/11 08:44:57 Response from 206.53.19.13:3478: (104 bytes)
+ INFO: 2022/10/11 08:44:57 Filtering Test II: Request to change both IP and port
+ INFO: 2022/10/11 08:44:57 Sending to 206.53.19.13:3478: (28 bytes)
+ INFO: 2022/10/11 08:45:00 Timed out waiting for response from server 206.53.19.13:3478
+ INFO: 2022/10/11 08:45:00 Filtering Test III: Request to change port only
+ INFO: 2022/10/11 08:45:00 Sending to 206.53.19.13:3478: (28 bytes)
+ INFO: 2022/10/11 08:45:03 Timed out waiting for response from server 206.53.19.13:3478
+ WARNING: 2022/10/11 08:45:03 => NAT filtering behavior: address and port dependent
+```
+
+```log
+[d5k@VM-24-15-centos ~]$ gowormhole nat
+ INFO: 2022/10/11 08:47:27 connecting to STUN server: stun.voip.blackberry.com:3478
+ INFO: 2022/10/11 08:47:28 Local address: 0.0.0.0:33542
+ INFO: 2022/10/11 08:47:28 Remote address: 206.53.19.13:3478
+ INFO: 2022/10/11 08:47:28 Mapping Test I: Regular binding request
+ INFO: 2022/10/11 08:47:28 Sending to 206.53.19.13:3478: (20 bytes)
+ INFO: 2022/10/11 08:47:28 Response from 206.53.19.13:3478: (104 bytes)
+ INFO: 2022/10/11 08:47:28 Received XOR-MAPPED-ADDRESS: 101.42.13.12:33542
+ INFO: 2022/10/11 08:47:28 Mapping Test II: Send binding request to the other address but primary port
+ INFO: 2022/10/11 08:47:28 Sending to 206.53.19.13:3478: (20 bytes)
+ INFO: 2022/10/11 08:47:28 Response from 206.53.19.13:3478: (104 bytes)
+ INFO: 2022/10/11 08:47:28 Received XOR-MAPPED-ADDRESS: 101.42.13.12:33542
+ WARNING: 2022/10/11 08:47:28 => NAT mapping behavior: endpoint independent
+ INFO: 2022/10/11 08:47:28 connecting to STUN server: stun.voip.blackberry.com:3478
+ INFO: 2022/10/11 08:47:28 Local address: 0.0.0.0:51783
+ INFO: 2022/10/11 08:47:28 Remote address: 206.53.19.13:3478
+ INFO: 2022/10/11 08:47:28 Filtering Test I: Regular binding request
+ INFO: 2022/10/11 08:47:28 Sending to 206.53.19.13:3478: (20 bytes)
+ INFO: 2022/10/11 08:47:29 Response from 206.53.19.13:3478: (104 bytes)
+ INFO: 2022/10/11 08:47:29 Filtering Test II: Request to change both IP and port
+ INFO: 2022/10/11 08:47:29 Sending to 206.53.19.13:3478: (28 bytes)
+ INFO: 2022/10/11 08:47:32 Timed out waiting for response from server 206.53.19.13:3478
+ INFO: 2022/10/11 08:47:32 Filtering Test III: Request to change port only
+ INFO: 2022/10/11 08:47:32 Sending to 206.53.19.13:3478: (28 bytes)
+ INFO: 2022/10/11 08:47:35 Timed out waiting for response from server 206.53.19.13:3478
+ WARNING: 2022/10/11 08:47:35 => NAT filtering behavior: address and port dependent
+[d5k@VM-24-15-centos ~]$
+```
+
+```
+[root@192_168_16_4 ~]# gowormhole nat
+ INFO: 2022/10/11 08:49:28 connecting to STUN server: stun.voip.blackberry.com:3478
+ INFO: 2022/10/11 08:49:29 Local address: 0.0.0.0:41392
+ INFO: 2022/10/11 08:49:29 Remote address: 206.53.19.13:3478
+ INFO: 2022/10/11 08:49:29 Mapping Test I: Regular binding request
+ INFO: 2022/10/11 08:49:29 Sending to 206.53.19.13:3478: (20 bytes)
+ INFO: 2022/10/11 08:49:29 Response from 206.53.19.13:3478: (104 bytes)
+ INFO: 2022/10/11 08:49:29 Received XOR-MAPPED-ADDRESS: 120.48.81.162:41392
+ INFO: 2022/10/11 08:49:29 Mapping Test II: Send binding request to the other address but primary port
+ INFO: 2022/10/11 08:49:29 Sending to 206.53.19.14:3478: (20 bytes)
+ INFO: 2022/10/11 08:49:29 Response from 206.53.19.14:3478: (104 bytes)
+ INFO: 2022/10/11 08:49:29 Received XOR-MAPPED-ADDRESS: 120.48.81.162:41392
+ WARNING: 2022/10/11 08:49:29 => NAT mapping behavior: endpoint independent
+ INFO: 2022/10/11 08:49:29 connecting to STUN server: stun.voip.blackberry.com:3478
+ INFO: 2022/10/11 08:49:29 Local address: 0.0.0.0:39523
+ INFO: 2022/10/11 08:49:29 Remote address: 206.53.19.13:3478
+ INFO: 2022/10/11 08:49:29 Filtering Test I: Regular binding request
+ INFO: 2022/10/11 08:49:29 Sending to 206.53.19.13:3478: (20 bytes)
+ INFO: 2022/10/11 08:49:29 Response from 206.53.19.13:3478: (104 bytes)
+ INFO: 2022/10/11 08:49:29 Filtering Test II: Request to change both IP and port
+ INFO: 2022/10/11 08:49:29 Sending to 206.53.19.13:3478: (28 bytes)
+ INFO: 2022/10/11 08:49:30 Response from 206.53.19.14:3479: (104 bytes)
+ WARNING: 2022/10/11 08:49:30 => NAT filtering behavior: endpoint independent
+ ```

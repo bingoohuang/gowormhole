@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bingoohuang/gowormhole/internal/util"
+
 	"github.com/bingoohuang/gowormhole"
 
 	"github.com/NYTimes/gziphandler"
@@ -190,7 +192,7 @@ func turnServers() []webrtc.ICEServer {
 	userPass := strings.SplitN(turnUser, ":", 2)
 
 	return []webrtc.ICEServer{{
-		URLs:       []string{turnServer},
+		URLs:       []string{util.Prefix("turn:", util.AppendPort(turnServer, 3478))},
 		Username:   userPass[0],
 		Credential: userPass[1],
 	}}
@@ -351,7 +353,7 @@ func signallingServerCmd(args ...string) {
 
 	// mondain/public-stun-list.txt https://gist.github.com/mondain/b0ec1cf5f60ae726202e
 	// https://github.com/pradt2/always-online-stun
-	stun := set.String("stun", "stun:stun2.l.google.com:19302", "list of STUN server addresses to tell clients to use")
+	stun := set.String("stun", "stun2.l.google.com:19302", "list of STUN server addresses to tell clients to use")
 	set.StringVar(&turnServer, "turn", "", "TURN server to use for relaying")
 	set.StringVar(&turnUser, "turn-user", "", "turn user in TURN server, e.g. user:password")
 	_ = set.Parse(args[1:])
@@ -366,7 +368,11 @@ func signallingServerCmd(args ...string) {
 
 	for _, s := range strings.Split(*stun, ",") {
 		if s != "" {
-			stunServers = append(stunServers, webrtc.ICEServer{URLs: []string{s}})
+			stunServers = append(stunServers, webrtc.ICEServer{
+				URLs: []string{
+					util.Prefix("stun:", util.AppendPort(s, 3478)),
+				},
+			})
 		}
 	}
 

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 
 	"rsc.io/qr"
 )
@@ -96,4 +97,16 @@ func If[T any](condition bool, a, b T) T {
 	}
 
 	return b
+}
+
+func Postfix(addr, postfix string) string {
+	return If(strings.HasSuffix(addr, postfix), addr, addr+postfix)
+}
+
+func Prefix(prefix, addr string) string {
+	return If(strings.HasPrefix(addr, prefix), addr, prefix+addr)
+}
+
+func AppendPort(addr string, defaultPort int) string {
+	return Postfix(addr, fmt.Sprintf(":%d", defaultPort))
 }

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bingoohuang/gowormhole/internal/util"
+
 	"github.com/pion/logging"
 	"github.com/pion/stun"
 )
@@ -22,25 +24,13 @@ func natSubCmd(args ...string) {
 		set.PrintDefaults()
 	}
 
-	addrStrPtr := set.String("server", "stun.voip.blackberry.com:3478", "STUN server address")
-	timeoutPtr := set.Duration("timeout", 3*time.Second, "timeout to wait for STUN server's response")
-	loglevelPtr := set.String("loglevel", "info", "logging level")
+	stunServer := set.String("stun", "stun.voip.blackberry.com:3478", "STUN server address")
+	timeout := set.Duration("timeout", 3*time.Second, "timeout to wait for STUN server's response")
+	loglevel := set.String("loglevel", "info", "logging level")
 	_ = set.Parse(args[1:])
 
-	var logLevel logging.LogLevel
-	switch strings.ToLower(*loglevelPtr) {
-	case "warn":
-		logLevel = logging.LogLevelWarn
-	case "info":
-		logLevel = logging.LogLevelInfo // default
-	case "debug":
-		logLevel = logging.LogLevelDebug
-	case "trace":
-		logLevel = logging.LogLevelTrace
-	}
-
-	log := logging.NewDefaultLeveledLoggerForScope("", logLevel, os.Stdout)
-	cmd := &natCmd{log: log, server: *addrStrPtr, timeout: *timeoutPtr}
+	log := logging.NewDefaultLeveledLoggerForScope("", parseLogLevel(*loglevel), os.Stdout)
+	cmd := &natCmd{log: log, stunServerAddr: util.AppendPort(*stunServer, 3478), timeout: *timeout}
 
 	if err := cmd.mappingTests(); err != nil {
 		log.Warn("NAT mapping behavior: inconclusive")
@@ -50,10 +40,25 @@ func natSubCmd(args ...string) {
 	}
 }
 
+func parseLogLevel(level string) logging.LogLevel {
+	switch strings.ToLower(level) {
+	case "warn":
+		return logging.LogLevelWarn
+	case "info":
+		return logging.LogLevelInfo
+	case "debug":
+		return logging.LogLevelDebug
+	case "trace":
+		return logging.LogLevelTrace
+	default:
+		return logging.LogLevelInfo
+	}
+}
+
 type natCmd struct {
-	log     *logging.DefaultLeveledLogger
-	server  string
-	timeout time.Duration
+	log            *logging.DefaultLeveledLogger
+	stunServerAddr string
+	timeout        time.Duration
 }
 
 type stunServerConn struct {
@@ -83,7 +88,7 @@ var (
 
 // RFC5780: 4.3.  Determining NAT Mapping Behavior
 func (n *natCmd) mappingTests() error {
-	mapTestConn, err := n.connect(n.server)
+	mapTestConn, err := n.connect(n.stunServerAddr)
 	if err != nil {
 		n.log.Warnf("Error creating STUN connection: %s", err.Error())
 		return err
@@ -120,9 +125,9 @@ func (n *natCmd) mappingTests() error {
 
 	// Test II: Send binding request to the other address but primary port
 	n.log.Info("Mapping Test II: Send binding request to the other address but primary port")
-	oaddr := *mapTestConn.OtherAddr
-	oaddr.Port = mapTestConn.RemoteAddr.Port
-	resp, err = mapTestConn.roundTrip(request, &oaddr)
+	otherAddr := *mapTestConn.OtherAddr
+	otherAddr.Port = mapTestConn.RemoteAddr.Port
+	resp, err = mapTestConn.roundTrip(request, &otherAddr)
 	if err != nil {
 		return err
 	}
@@ -156,7 +161,7 @@ func (n *natCmd) mappingTests() error {
 
 // RFC5780: 4.4.  Determining NAT Filtering Behavior
 func (n *natCmd) filteringTests() error {
-	mapTestConn, err := n.connect(n.server)
+	mapTestConn, err := n.connect(n.stunServerAddr)
 	if err != nil {
 		n.log.Warnf("Error creating STUN connection: %s", err.Error())
 		return err
@@ -255,7 +260,7 @@ func (n *natCmd) parse(msg *stun.Message) (ret struct {
 			stun.AttrResponseOrigin,
 			stun.AttrMappedAddress,
 			stun.AttrSoftware:
-			break //nolint: staticcheck
+			break
 		default:
 			n.log.Debugf("\t%v (l=%v)", attr, attr.Length)
 		}

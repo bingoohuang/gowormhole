@@ -505,9 +505,7 @@ func Join(slot, pass string, sigserv string) (*Wormhole, error) {
 	wsaddr := u.String()
 
 	// Start the handshake.
-	ws, _, err := websocket.Dial(context.TODO(), wsaddr, &websocket.DialOptions{
-		Subprotocols: []string{Protocol},
-	})
+	ws, _, err := websocket.Dial(context.TODO(), wsaddr, &websocket.DialOptions{Subprotocols: []string{Protocol}})
 	if err != nil {
 		return nil, err
 	}
