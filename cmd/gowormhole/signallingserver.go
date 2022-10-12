@@ -203,8 +203,6 @@ func turnServers() []webrtc.ICEServer {
 
 // relay sets up a rendezvous on a slot and pipes the two websockets together.
 func relay(w http.ResponseWriter, r *http.Request) {
-	slotKey := r.URL.Path[1:] // strip leading slash
-	var rconn *websocket.Conn
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		// This sounds nasty but checking origin only matters if requests
 		// change any user state on the server, aka CSRF. We don't have any
@@ -217,8 +215,7 @@ func relay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if conn.Subprotocol() != wormhole.Protocol {
-		// Make sure we negotiated the right protocol, since "blank" is also a
-		// default one.
+		// Make sure we negotiated the right protocol, since "blank" is also a default one.
 		protocolErrorCounter.WithLabelValues("wrongversion").Inc()
 		_ = conn.Close(wormhole.CloseWrongProto, "wrong protocol, please upgrade client")
 		return
@@ -231,6 +228,10 @@ func relay(w http.ResponseWriter, r *http.Request) {
 		ICEServers []webrtc.ICEServer `json:"iceServers,omitempty"`
 	}{}
 	initMsg.ICEServers = append(turnServers(), stunServers...)
+
+	var rconn *websocket.Conn
+
+	slotKey := r.URL.Path[1:] // strip leading slash
 
 	go func() {
 		if slotKey == "" {
@@ -258,8 +259,7 @@ func relay(w http.ResponseWriter, r *http.Request) {
 					slots.Delete(slotKey)
 					_ = conn.Close(wormhole.CloseSlotTimedOut, "timed out")
 					return
-				case <-time.After(30 * time.Second):
-					// Do a WebSocket Ping every 30 seconds.
+				case <-time.After(30 * time.Second): // Do a WebSocket Ping every 30 seconds.
 					_ = conn.Ping(ctx)
 				case sc <- conn:
 					break wait
@@ -365,7 +365,6 @@ func signallingServerCmd(args ...string) {
 	if (*cert == "") != (*key == "") {
 		log.Fatalf("-cert and -key options must be provided together or both left empty")
 	}
-
 	if turnServer != "" && turnUser == "" {
 		log.Fatal("cannot use a TURN server without a secret")
 	}
@@ -374,16 +373,14 @@ func signallingServerCmd(args ...string) {
 		if p, _ := new(godaemon.Context).Reborn(); p != nil {
 			os.Exit(0)
 		}
-		log.Print("---  daemon started ---")
+		log.Print("--- daemon started ---")
 	}
 	golog.Setup()
 
 	for _, s := range strings.Split(*stun, ",") {
 		if s != "" {
 			stunServers = append(stunServers, webrtc.ICEServer{
-				URLs: []string{
-					util.Prefix("stun:", util.AppendPort(s, 3478)),
-				},
+				URLs: []string{util.Prefix("stun:", util.AppendPort(s, 3478))},
 			})
 		}
 	}
@@ -412,7 +409,6 @@ func signallingServerCmd(args ...string) {
 			}
 		}
 		w.Header().Set("Content-Security-Policy", csp)
-
 		// Set a small max age for cache. We might want to switch to a content-addressed
 		// resource naming scheme and change this to immutable, but until then disable caching.
 		w.Header().Set("Cache-Control", "no-cache")
