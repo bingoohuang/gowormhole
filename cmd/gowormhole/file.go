@@ -10,7 +10,7 @@ import (
 
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
-	"github.com/cheggaaa/pb/v3"
+	"github.com/bingoohuang/pb"
 )
 
 const (
@@ -70,10 +70,10 @@ func receiveSubCmd(args ...string) {
 
 		written, err := io.CopyBuffer(f, barReader, make([]byte, msgChunkSize))
 		bar.Finish() // finish bar
-		util.FatalfIf(err != nil, "\ncould not save file: %v", err)
+		util.FatalfIf(err != nil, "could not save file: %v", err)
 
 		if written != int64(h.Size) {
-			util.Fatalf("\nEOF before receiving all bytes: (%d/%d)", written, h.Size)
+			util.Fatalf("EOF before receiving all bytes: (%d/%d)", written, h.Size)
 		}
 		_ = f.Close()
 		_, _ = fmt.Fprintf(set.Output(), "done\n")

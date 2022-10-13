@@ -40,7 +40,7 @@ func usage() {
 	for key := range subcmds {
 		util.Printf("  %s\n", key)
 	}
-	util.Printf("\nflags:\n")
+	util.Printf("flags:\n")
 	flag.PrintDefaults()
 }
 
