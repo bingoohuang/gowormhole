@@ -9,11 +9,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/bingoohuang/gowormhole/internal/util"
-
-	"github.com/bingoohuang/gg/pkg/v"
-
 	"github.com/atotto/clipboard"
+	"github.com/bingoohuang/gg/pkg/v"
+	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wordlist"
 	"github.com/bingoohuang/gowormhole/wormhole"
 )

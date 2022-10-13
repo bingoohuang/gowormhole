@@ -13,13 +13,13 @@ import (
 	"encoding/base64"
 	"io"
 	"strconv"
-	"syscall/js"
 
 	"filippo.io/cpace"
 	"github.com/bingoohuang/gowormhole/wordlist"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/nacl/secretbox"
 	"rsc.io/qr"
+	"syscall/js"
 )
 
 // state is the PAKE state so far.

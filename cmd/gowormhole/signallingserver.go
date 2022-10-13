@@ -17,14 +17,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bingoohuang/golog"
-
-	"github.com/bingoohuang/gowormhole/internal/util"
-
-	"github.com/bingoohuang/gowormhole"
-
 	"github.com/NYTimes/gziphandler"
 	"github.com/bingoohuang/godaemon"
+	"github.com/bingoohuang/golog"
+	"github.com/bingoohuang/gowormhole"
+	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wormhole"
 	webrtc "github.com/pion/webrtc/v3"
 	"github.com/prometheus/client_golang/prometheus"

@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
-
 	"github.com/cheggaaa/pb/v3"
 )
 
@@ -98,6 +98,7 @@ func sendSubCmd(args ...string) {
 		os.Exit(2)
 	}
 	c := newConn(*code, *length)
+	defer iox.Close(c)
 
 	for _, filename := range set.Args() {
 		f, err := os.Open(filename)
@@ -124,13 +125,12 @@ func sendSubCmd(args ...string) {
 
 		written, err := io.CopyBuffer(barWriter, f, make([]byte, msgChunkSize))
 		bar.Finish() // finish bar
-		util.FatalfIf(err != nil, "\ncould not send file: %v", err)
+		util.FatalfIf(err != nil, "could not send file: %v", err)
 
 		if written != info.Size() {
-			util.Fatalf("\nEOF before sending all bytes: (%d/%d)", written, info.Size())
+			util.Fatalf("EOF before sending all bytes: (%d/%d)", written, info.Size())
 		}
 		_ = f.Close()
 		_, _ = fmt.Fprintf(set.Output(), "done\n")
 	}
-	_ = c.Close()
 }

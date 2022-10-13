@@ -43,9 +43,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bingoohuang/gowormhole/internal/util"
-
 	"filippo.io/cpace"
+	"github.com/bingoohuang/gowormhole/internal/util"
 	webrtc "github.com/pion/webrtc/v3"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/nacl/secretbox"

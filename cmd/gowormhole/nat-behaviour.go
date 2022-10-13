@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/bingoohuang/gowormhole/internal/util"
-
 	"github.com/pion/logging"
 	"github.com/pion/stun"
 )
