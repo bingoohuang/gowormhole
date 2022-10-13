@@ -152,7 +152,7 @@ func (list varintEncoding) Decode(code string) (slot int, pass []byte) {
 }
 
 func (list varintEncoding) Match(prefix string) string {
-	return match([]string(list), prefix)
+	return match(list, prefix)
 }
 
 // magicWormholeEncoding maps codes into a word for each byte, with the slot encoded
@@ -200,7 +200,7 @@ func (list magicWormholeEncoding) Decode(code string) (slot int, pass []byte) {
 }
 
 func (list magicWormholeEncoding) Match(prefix string) string {
-	return match([]string(list), prefix)
+	return match(list, prefix)
 }
 
 // indexOf finds the index of word in list. It returns -1 if it is not in the list.

@@ -45,7 +45,7 @@ import (
 
 	"filippo.io/cpace"
 	"github.com/bingoohuang/gowormhole/internal/util"
-	webrtc "github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v3"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/nacl/secretbox"
 	"golang.org/x/net/proxy"
@@ -102,9 +102,6 @@ var (
 
 	// ErrBadKey is returned when the peer on the same slot uses a different password.
 	ErrBadKey = errors.New("bad key")
-
-	// ErrNoSuchSlot indicates no one is on the slot requested.
-	ErrNoSuchSlot = errors.New("no such slot")
 
 	// ErrTimedOut indicates signalling has timed out.
 	ErrTimedOut = errors.New("timed out")

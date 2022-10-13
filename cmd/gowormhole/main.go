@@ -89,7 +89,7 @@ func newWormhole(length int) *wormhole.Wormhole {
 		slot, err := strconv.Atoi(s)
 		util.FatalfIf(err != nil, "got invalid slot from signalling server: %v", s)
 		word := wordlist.Encode(slot, pass)
-		clipboard.WriteAll(word)
+		_ = clipboard.WriteAll(word)
 		util.PrintQRCode(sigserv, word)
 	}()
 	c, err := wormhole.New(string(pass), sigserv, slotc)

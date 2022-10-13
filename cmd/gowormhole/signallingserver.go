@@ -23,7 +23,7 @@ import (
 	"github.com/bingoohuang/gowormhole"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wormhole"
-	webrtc "github.com/pion/webrtc/v3"
+	"github.com/pion/webrtc/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/crypto/acme/autocert"

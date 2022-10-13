@@ -12,13 +12,13 @@ import (
 func pipeSubCmd(args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
-		fmt.Fprintf(set.Output(), "netcat-like pipe\n\n")
-		fmt.Fprintf(set.Output(), "usage: %s %s [code]\n\n", os.Args[0], args[0])
-		fmt.Fprintf(set.Output(), "flags:\n")
+		_, _ = fmt.Fprintf(set.Output(), "netcat-like pipe\n\n")
+		_, _ = fmt.Fprintf(set.Output(), "usage: %s %s [code]\n\n", os.Args[0], args[0])
+		_, _ = fmt.Fprintf(set.Output(), "flags:\n")
 		set.PrintDefaults()
 	}
 	length := set.Int("length", 2, "length of generated secret, if generating")
-	set.Parse(args[1:])
+	_ = set.Parse(args[1:])
 
 	if set.NArg() > 1 {
 		set.Usage()
@@ -42,5 +42,5 @@ func pipeSubCmd(args ...string) {
 		done <- struct{}{}
 	}()
 	<-done
-	c.Close()
+	_ = c.Close()
 }
