@@ -3,6 +3,7 @@ package util
 import (
 	"flag"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"strconv"
@@ -12,7 +13,7 @@ import (
 )
 
 func PrintQRCode(baseURL, code string) {
-	Printf("%s\n", code)
+	log.Printf("Wormhole code: %s\n", code)
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return
@@ -54,7 +55,7 @@ func PrintQRCode(baseURL, code string) {
 		Printf("█")
 	}
 	Printf("████████\n")
-	Printf("%s\n", u.String())
+	log.Printf("%s\n", u.String())
 }
 
 func LookupEnvOrBool(key string, defaultVal bool) bool {
@@ -83,7 +84,7 @@ func FatalfIf(condition bool, format string, v ...interface{}) {
 }
 
 func Fatalf(format string, v ...interface{}) {
-	Printf(format+"\n", v...)
+	log.Printf(format, v...)
 	os.Exit(1)
 }
 

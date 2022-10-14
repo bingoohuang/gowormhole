@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strconv"
 
@@ -101,7 +102,7 @@ func newWormhole(length int) *wormhole.Wormhole {
 	)
 
 	util.FatalfIf(err != nil, "could not dial: %v", err)
-	util.Printf("connected: %s\n", util.If(c.IsRelay(), "relay", "direct"))
+	log.Printf("connected: %s\n", util.If(c.IsRelay(), "relay", "direct"))
 	return c
 }
 
@@ -115,6 +116,6 @@ func joinWormhole(code string) *wormhole.Wormhole {
 try upgrading the client: go get github.com/bingoohuang/gowormhole/cmd/gowormhole`)
 
 	util.FatalfIf(err != nil, "could not dial: %v", err)
-	util.Printf("connected: %s\n", util.If(c.IsRelay(), "relay", "direct"))
+	log.Printf("connected: %s\n", util.If(c.IsRelay(), "relay", "direct"))
 	return c
 }
