@@ -18,3 +18,8 @@ var Web = func() fs.FS {
 	}
 	return sub
 }()
+
+const (
+	DefaultStunPort = 3478
+	DefaultTurnPort = 3478
+)

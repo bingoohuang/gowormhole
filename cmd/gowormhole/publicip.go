@@ -4,9 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
+	"github.com/bingoohuang/gowormhole"
+	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -19,7 +20,7 @@ func publicIPSubCmd(args ...string) {
 		set.PrintDefaults()
 	}
 
-	stunAddrPtr := set.String("stun", "stun.voip.blackberry.com:3478", "STUN server address, e.g. stun:stun.l.google.com:19302")
+	stunAddrPtr := set.String("stun", "stun.voip.blackberry.com", "STUN server address, e.g. stun:stun.l.google.com:19302")
 	timeoutPtr := set.Duration("timeout", 3*time.Second, "timeout to wait for STUN server's response")
 	_ = set.Parse(args[1:])
 
@@ -37,12 +38,11 @@ func PrintPublicIP(stunAddr string, timeout time.Duration) {
 
 // DiscoverPublicIP discovers public IP address of executed device by STUN server
 func DiscoverPublicIP(stunAddr string, timeout time.Duration) (string, error) {
-	if strings.HasPrefix(stunAddr, "stun:") {
-		stunAddr = stunAddr[len("stun:"):]
-	}
 	c, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{{
-			URLs: []string{"stun:" + stunAddr},
+			URLs: []string{
+				util.Prefix("stun:", util.AppendPort(stunAddr, gowormhole.DefaultStunPort)),
+			},
 		}},
 	})
 	if err != nil {

@@ -192,7 +192,7 @@ func turnServers() []webrtc.ICEServer {
 	userPass := strings.SplitN(turnUser, ":", 2)
 
 	return []webrtc.ICEServer{{
-		URLs:       []string{util.Prefix("turn:", util.AppendPort(turnServer, 3478))},
+		URLs:       []string{util.Prefix("turn:", util.AppendPort(turnServer, gowormhole.DefaultTurnPort))},
 		Username:   userPass[0],
 		Credential: userPass[1],
 	}}
@@ -377,7 +377,7 @@ func signallingServerCmd(args ...string) {
 	for _, s := range strings.Split(*stun, ",") {
 		if s != "" {
 			stunServers = append(stunServers, webrtc.ICEServer{
-				URLs: []string{util.Prefix("stun:", util.AppendPort(s, 3478))},
+				URLs: []string{util.Prefix("stun:", util.AppendPort(s, gowormhole.DefaultStunPort))},
 			})
 		}
 	}

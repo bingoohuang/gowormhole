@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bingoohuang/gowormhole"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/pion/logging"
 	"github.com/pion/stun"
@@ -23,13 +24,17 @@ func natSubCmd(args ...string) {
 		set.PrintDefaults()
 	}
 
-	stunServer := set.String("stun", "stun.voip.blackberry.com:3478", "STUN server address")
+	stunServer := set.String("stun", "stun.voip.blackberry.com", "STUN server address")
 	timeout := set.Duration("timeout", 3*time.Second, "timeout to wait for STUN server's response")
 	loglevel := set.String("loglevel", "info", "logging level")
 	_ = set.Parse(args[1:])
 
 	log := logging.NewDefaultLeveledLoggerForScope("", parseLogLevel(*loglevel), os.Stdout)
-	cmd := &natCmd{log: log, stunServerAddr: util.AppendPort(*stunServer, 3478), timeout: *timeout}
+	cmd := &natCmd{
+		log:            log,
+		timeout:        *timeout,
+		stunServerAddr: util.AppendPort(*stunServer, gowormhole.DefaultStunPort),
+	}
 
 	if err := cmd.mappingTests(); err != nil {
 		log.Warn("NAT mapping behavior: inconclusive")

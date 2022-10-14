@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bingoohuang/gowormhole"
 	"github.com/pion/logging"
 	"github.com/pion/turn/v2"
 )
@@ -24,7 +25,7 @@ func turnClientSubCmd(args ...string) {
 	}
 
 	host := set.String("host", "127.0.0.1", "TURN Server name.")
-	port := set.Int("port", 3478, "Listening port.")
+	port := set.Int("port", gowormhole.DefaultTurnPort, "Listening port.")
 	user := set.String("user", "scott:tiger", `A pair of username and password (e.g. "user:pass")`)
 	realm := set.String("realm", "d5k.ly", `Realm (defaults to "d5k.ly")`)
 	ping := set.Bool("ping", false, "Run ping test")

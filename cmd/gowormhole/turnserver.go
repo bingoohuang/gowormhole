@@ -13,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/bingoohuang/gowormhole"
 	"github.com/pion/logging"
 	"github.com/pion/stun"
 	"github.com/pion/turn/v2"
@@ -34,7 +35,7 @@ func turnServerSubCmd(args ...string) {
 	}
 
 	publicIP := set.String("public-ip", "127.0.0.1", "IP Address that TURN can be contacted by.")
-	port := set.Int("port", 3478, "Listening port.")
+	port := set.Int("port", gowormhole.DefaultTurnPort, "Listening port.")
 	users := set.String("users", "scott=tiger", `List of username and password (e.g. "user=pass,user=pass")`)
 	realm := set.String("realm", "pion.ly", `Realm (defaults to "pion.ly")`)
 	portRange := set.String("portRange", "", `turn.RelayAddressGeneratorPortRange, like 50000-55000`)
