@@ -54,8 +54,8 @@ github.com/bingoohuang/gg v0.0.0-20221013063601-18ab764eda41 h1:ugWYfjmNLCctYkG9
 github.com/bingoohuang/gg v0.0.0-20221013063601-18ab764eda41/go.mod h1:YTSnmf7zkGIb5pwDLMW1GaOFbtD3+Jyg6anBytG2wwA=
 github.com/bingoohuang/godaemon v0.0.0-20220907040433-7f208f406639 h1:QL1AI8AFUhhchCZi1DtfEQT8zDfuuufDnyC+amJNNtc=
 github.com/bingoohuang/godaemon v0.0.0-20220907040433-7f208f406639/go.mod h1:xfxElNPL0/tWWnqq1Iq1W1N1lnG8032nJ5X/JhDdOwU=
-github.com/bingoohuang/golog v0.0.0-20220928084502-cdb748e15d3c h1:ce5Q8BQqgvVgVonydBWnDetCC7uFk05+uMGyEFfXLmk=
-github.com/bingoohuang/golog v0.0.0-20220928084502-cdb748e15d3c/go.mod h1:GpONkik2T1ABcjaHUfK8tfEGpxFaV5zysPpyoAMih00=
+github.com/bingoohuang/golog v0.0.0-20221104075724-24493519ae6a h1:WNh89NvENKopmFbXMQEn+WbQpdaLQ5AqlpHWpeRaFtc=
+github.com/bingoohuang/golog v0.0.0-20221104075724-24493519ae6a/go.mod h1:18u49CdpUpGmqLfvNXkHJ7COoS295w7QZ+nxAr8sOHI=
 github.com/bingoohuang/pb v0.0.0-20221013134435-b2ba3ccc5001 h1:ztCZY7mHF8QIIFoLbHOkOfI0GkxJQpFvpxA0ADU1txQ=
 github.com/bingoohuang/pb v0.0.0-20221013134435-b2ba3ccc5001/go.mod h1:EeV1re6XNEOERD48uUzJjCewKZOvvjrNzuzsX0CWcOc=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=

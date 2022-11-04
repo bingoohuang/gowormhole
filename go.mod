@@ -2,13 +2,17 @@ module github.com/bingoohuang/gowormhole
 
 go 1.19
 
+//replace (
+//	github.com/bingoohuang/golog => /Users/bingoobjca/github/golog
+//)
+
 require (
 	filippo.io/cpace v0.0.0-20210101143347-24d601e2e469
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/atotto/clipboard v0.1.4
 	github.com/bingoohuang/gg v0.0.0-20221013063601-18ab764eda41
 	github.com/bingoohuang/godaemon v0.0.0-20220907040433-7f208f406639
-	github.com/bingoohuang/golog v0.0.0-20220928084502-cdb748e15d3c
+	github.com/bingoohuang/golog v0.0.0-20221104075724-24493519ae6a
 	github.com/bingoohuang/pb v0.0.0-20221013134435-b2ba3ccc5001
 	github.com/pion/logging v0.2.2
 	github.com/pion/stun v0.3.6-0.20220524134636-7e647ef6201c
