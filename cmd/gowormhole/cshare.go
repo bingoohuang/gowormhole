@@ -5,10 +5,28 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/bingoohuang/gg/pkg/v"
 	"github.com/creasty/defaults"
 	"io"
 	"log"
 )
+
+//export GetVersion
+func GetVersion() string {
+	ver, _ := json.Marshal(struct {
+		GitCommit  string `json:"gitCommit"`
+		BuildTime  string `json:"buildTime"`
+		GoVersion  string `json:"goVersion"`
+		AppVersion string `json:"appVersion"`
+	}{
+		GitCommit:  v.GitCommit,
+		BuildTime:  v.BuildTime,
+		GoVersion:  v.GoVersion,
+		AppVersion: v.AppVersion,
+	})
+
+	return string(ver)
+}
 
 //export RecvFiles
 func RecvFiles(argJSON string) string {
