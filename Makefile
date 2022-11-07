@@ -39,6 +39,11 @@ endif
 so:
 	# New in Go 1.5, build Go dynamic lib
 	go build $(FLAGS) -o awesome$(DYLIB_EXT) -buildmode=c-shared ./cmd/gowormhole
+dll:
+	git clone https://github.com/bingoohuang/gowormhole.git
+	cd gowormhole
+	$env:GOPROXY = "https://goproxy.cn"
+	go build -ldflags -s -o gowormhole.dll -buildmode=c-shared ./cmd/gowormhole
 
 clean:
 	rm -f awesome.*
