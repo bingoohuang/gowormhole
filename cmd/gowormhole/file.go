@@ -12,7 +12,6 @@ import (
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/wormhole"
 	"github.com/bingoohuang/pb"
-	"github.com/creasty/defaults"
 )
 
 const (
@@ -44,27 +43,6 @@ type receiveFileArg struct {
 	SecretLength int    `json:"secretLength" default:"2"`
 	Dir          string `json:"dir"`
 	Progress     bool   `json:"progress"`
-}
-
-func RecvFiles(argJSON string) string {
-	var arg receiveFileArg
-	if err := json.Unmarshal([]byte(argJSON), &arg); err != nil {
-		log.Printf("Unmarshal %s failed: %v", argJSON, err)
-		return fmt.Sprintf("unmarshal %s failed: %v", argJSON, err)
-	}
-
-	if err := defaults.Set(&arg); err != nil {
-		log.Printf("defaults.Set failed: %v", err)
-	}
-
-	if err := receive(arg); err != nil {
-		if err != io.EOF {
-			log.Printf("receive failed: %v", err)
-			return fmt.Sprintf("receive failed: %v", err)
-		}
-	}
-
-	return ""
 }
 
 func receive(arg receiveFileArg) error {
@@ -186,26 +164,6 @@ type sendFileArg struct {
 	SecretLength int      `json:"secretLength" default:"2"`
 	Files        []string `json:"files"`
 	Progress     bool     `json:"progress"`
-}
-
-// SendFiles send files by wormhole
-func SendFiles(sendFileArgJSON string) string {
-	var arg sendFileArg
-	if err := json.Unmarshal([]byte(sendFileArgJSON), &arg); err != nil {
-		log.Printf("Unmarshal %s failed: %v", sendFileArgJSON, err)
-		return fmt.Sprintf("Unmarshal %s failed: %v", sendFileArgJSON, err)
-	}
-
-	if err := defaults.Set(&arg); err != nil {
-		log.Printf("defaults.Set failed: %v", err)
-	}
-
-	if err := sendFiles(arg); err != nil {
-		log.Printf("sendFiles %s failed: %v", sendFileArgJSON, err)
-		return fmt.Sprintf("sendFiles %s failed: %v", sendFileArgJSON, err)
-	}
-
-	return ""
 }
 
 func sendFiles(args sendFileArg) error {

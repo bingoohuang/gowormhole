@@ -1,4 +1,5 @@
 .PHONY: wasm
+
 wasm: js
 	GOOS=js GOARCH=wasm go build -o ./web/webwormhole.wasm ./web
 	cp $(shell go env GOROOT)/misc/wasm/wasm_exec.js ./web/wasm_exec.js
@@ -24,3 +25,20 @@ js:
 	tsc -T ES2018 --strict web/main.ts
 	tsc -T ES2018 --strict web/ww.ts
 	tsc -T ES2018 --strict web/sw.ts
+
+UNAME := $(shell uname)
+
+ifeq ($(UNAME), Darwin)
+    DYLIB_EXT := .dylib
+    FLAGS := -ldflags -s
+else
+    DYLIB_EXT := .so
+    FLAGS := ''
+endif
+
+so:
+	# New in Go 1.5, build Go dynamic lib
+	go build $(FLAGS) -o awesome$(DYLIB_EXT) -buildmode=c-shared ./cmd/gowormhole
+
+clean:
+	rm -f awesome.*
