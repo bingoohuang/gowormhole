@@ -22,6 +22,7 @@ var subcmds = map[string]func(args ...string){
 	"nat":         natSubCmd,
 	"send":        sendSubCmd,
 	"receive":     receiveSubCmd,
+	"recv":        receiveSubCmd,
 	"pipe":        pipeSubCmd,
 	"server":      signallingServerCmd,
 	"turn":        turnServerSubCmd,

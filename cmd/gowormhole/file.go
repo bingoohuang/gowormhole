@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 
 	"github.com/bingoohuang/gg/pkg/iox"
-	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wormhole"
 	"github.com/bingoohuang/pb"
+	"github.com/creasty/defaults"
 )
 
 const (
@@ -28,6 +28,57 @@ type header struct {
 }
 
 func receiveSubCmd(args ...string) {
+	dir, code, passLength := parseFlags(args)
+	if err := receive(receiveFileArg{
+		Code:         code,
+		SecretLength: passLength,
+		Dir:          dir,
+		Progress:     true,
+	}); err != nil && err != io.EOF {
+		log.Fatalf("receiving failed: %v", err)
+	}
+}
+
+type receiveFileArg struct {
+	Code         string `json:"code"`
+	SecretLength int    `json:"secretLength" default:"2"`
+	Dir          string `json:"dir"`
+	Progress     bool   `json:"progress"`
+}
+
+func RecvFiles(argJSON string) string {
+	var arg receiveFileArg
+	if err := json.Unmarshal([]byte(argJSON), &arg); err != nil {
+		log.Printf("Unmarshal %s failed: %v", argJSON, err)
+		return fmt.Sprintf("unmarshal %s failed: %v", argJSON, err)
+	}
+
+	if err := defaults.Set(&arg); err != nil {
+		log.Printf("defaults.Set failed: %v", err)
+	}
+
+	if err := receive(arg); err != nil {
+		if err != io.EOF {
+			log.Printf("receive failed: %v", err)
+			return fmt.Sprintf("receive failed: %v", err)
+		}
+	}
+
+	return ""
+}
+
+func receive(arg receiveFileArg) error {
+	c := newConn(arg.Code, arg.SecretLength)
+	defer iox.Close(c)
+
+	for {
+		if err := receiving(c, arg.Dir, arg.Progress); err != nil {
+			return err
+		}
+	}
+}
+
+func parseFlags(args []string) (dir, code string, passLength int) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "receive files\n\n")
@@ -43,48 +94,60 @@ func receiveSubCmd(args ...string) {
 		set.Usage()
 		os.Exit(2)
 	}
-	c := newConn(set.Arg(0), *length)
-	defer iox.Close(c)
 
-	// TODO append number to existing filenames?
-
-	for {
-		if err := receiving(c, *directory); err != nil {
-			break
-		}
-	}
+	dir = *directory
+	code = set.Arg(0)
+	passLength = *length
+	return
 }
 
-func receiving(c *wormhole.Wormhole, directory string) error {
+func receiving(c *wormhole.Wormhole, directory string, progress bool) error {
 	// First message is the header. 1k should be enough.
 	buf := make([]byte, 1<<10)
 	n, err := c.Read(buf)
 	if err == io.EOF {
-		return err
+		return io.EOF
 	}
-	util.FatalfIf(err != nil, "could not read file header: %v", err)
+
+	if err != nil {
+		return fmt.Errorf("read file header failed: %w", err)
+	}
 
 	var h header
-	err = json.Unmarshal(buf[:n], &h)
-	util.FatalfIf(err != nil, "could not decode file header: %v", err)
+	if err := json.Unmarshal(buf[:n], &h); err != nil {
+		return fmt.Errorf("decode file header %s failed: %w", buf[:n], err)
+	}
 
-	f, err := os.Create(filepath.Join(directory, filepath.Clean(h.Name)))
-	util.FatalfIf(err != nil, "could not create output file %s: %v", h.Name, err)
+	name := filepath.Clean(h.Name)
+	f, err := os.Create(filepath.Join(directory, name))
+	if err != nil {
+		return fmt.Errorf("create output file %s failed: %w", h.Name, err)
+	}
+
 	defer iox.Close(f)
 
 	log.Printf("receiving %v... ", h.Name)
 
 	reader := io.LimitReader(c, int64(h.Size))
 
-	bar := pb.Full.Start64(int64(h.Size))   // start new bar
-	barReader := bar.NewProxyReader(reader) // create proxy reader
+	var bar *pb.ProgressBar
+	if progress {
+		bar = pb.Full.Start64(int64(h.Size)) // start new bar
+		reader = bar.NewProxyReader(reader)  // create proxy reader
+	}
 
-	written, err := io.CopyBuffer(f, barReader, make([]byte, msgChunkSize))
-	bar.Finish() // finish bar
-	util.FatalfIf(err != nil, "could not receive file: %v", err)
+	written, err := io.CopyBuffer(f, reader, make([]byte, msgChunkSize))
+
+	if progress {
+		bar.Finish() // finish bar
+	}
+
+	if err != nil {
+		return fmt.Errorf("create receive file  failed%s: %w", h.Name, err)
+	}
 
 	if written != int64(h.Size) {
-		util.Fatalf("EOF before receiving all bytes: (%d/%d)", written, h.Size)
+		return fmt.Errorf("EOF before receiving all bytes: (%d/%d)", written, h.Size)
 	}
 
 	log.Printf("receive file %s done", h.Name)
@@ -107,43 +170,97 @@ func sendSubCmd(args ...string) {
 		set.Usage()
 		os.Exit(2)
 	}
-	c := newConn(*code, *length)
-	defer iox.Close(c)
 
-	for _, filename := range set.Args() {
-		sendFile(c, filename)
+	if err := sendFiles(sendFileArg{
+		Code:         *code,
+		SecretLength: *length,
+		Files:        set.Args(),
+		Progress:     true,
+	}); err != nil {
+		log.Fatalf("sendFiles failed: %v", err)
 	}
 }
 
-func sendFile(c *wormhole.Wormhole, filename string) {
+type sendFileArg struct {
+	Code         string   `json:"code"`
+	SecretLength int      `json:"secretLength" default:"2"`
+	Files        []string `json:"files"`
+	Progress     bool     `json:"progress"`
+}
+
+// SendFiles send files by wormhole
+func SendFiles(sendFileArgJSON string) string {
+	var arg sendFileArg
+	if err := json.Unmarshal([]byte(sendFileArgJSON), &arg); err != nil {
+		log.Printf("Unmarshal %s failed: %v", sendFileArgJSON, err)
+		return fmt.Sprintf("Unmarshal %s failed: %v", sendFileArgJSON, err)
+	}
+
+	if err := defaults.Set(&arg); err != nil {
+		log.Printf("defaults.Set failed: %v", err)
+	}
+
+	if err := sendFiles(arg); err != nil {
+		log.Printf("sendFiles %s failed: %v", sendFileArgJSON, err)
+		return fmt.Sprintf("sendFiles %s failed: %v", sendFileArgJSON, err)
+	}
+
+	return ""
+}
+
+func sendFiles(args sendFileArg) error {
+	c := newConn(args.Code, args.SecretLength)
+	defer iox.Close(c)
+
+	for _, filename := range args.Files {
+		if err := sendFile(c, filename, args.Progress); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func sendFile(c io.Writer, filename string, progress bool) error {
 	f, err := os.Open(filename)
-	util.FatalfIf(err != nil, "could not open file %s: %v", filename, err)
+	if err != nil {
+		return fmt.Errorf("open file %s failed: %w", filename, err)
+	}
 	defer iox.Close(f)
 
 	info, err := f.Stat()
-	util.FatalfIf(err != nil, "could not stat file %s: %v", filename, err)
+	if err != nil {
+		return fmt.Errorf("stat file %s failed: %w", filename, err)
+	}
 
 	baseFileName := filepath.Base(filepath.Clean(filename))
-	h, err := json.Marshal(header{Name: baseFileName, Size: int(info.Size())})
+	he := header{Name: baseFileName, Size: int(info.Size())}
+	h, err := json.Marshal(he)
 	if err != nil {
-		util.Fatalf("failed to marshal json: %v", err)
+		return fmt.Errorf("marshal header %s failed: %w", baseFileName, err)
 	}
 	_, err = c.Write(h)
-	if err != nil {
-		util.Fatalf("could not send file header: %v", err)
-	}
 	log.Printf("sending %v... ", filename)
 
-	bar := pb.Full.Start64(info.Size()) // start new bar
-	barWriter := bar.NewProxyWriter(c)  // create proxy reader
+	var bar *pb.ProgressBar
+	if progress {
+		bar = pb.Full.Start64(info.Size()) // start new bar
+		c = bar.NewProxyWriter(c)          // create proxy reader
+	}
 
-	written, err := io.CopyBuffer(barWriter, f, make([]byte, msgChunkSize))
-	bar.Finish() // finish bar
-	util.FatalfIf(err != nil, "could not send file: %v", err)
+	written, err := io.CopyBuffer(c, f, make([]byte, msgChunkSize))
+	if progress {
+		bar.Finish() // finish bar
+	}
+
+	if err != nil {
+		return fmt.Errorf("send file %s failed: %w", filename, err)
+	}
 
 	if written != info.Size() {
-		util.Fatalf("EOF before sending all bytes: (%d/%d)", written, info.Size())
+		return fmt.Errorf("EOF before sending all bytes: (%d/%d)", written, info.Size())
 	}
 
 	log.Printf("send file %s done", filename)
+	return nil
 }

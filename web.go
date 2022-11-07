@@ -20,6 +20,8 @@ var Web = func() fs.FS {
 }()
 
 const (
+	// DefaultStunPort is the default stun server's port.
 	DefaultStunPort = 3478
+	// DefaultTurnPort is the default turn server's port.
 	DefaultTurnPort = 3478
 )
