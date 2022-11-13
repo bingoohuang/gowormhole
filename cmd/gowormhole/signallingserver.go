@@ -9,22 +9,19 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/NYTimes/gziphandler"
+	"github.com/bingoohuang/gg/pkg/ss"
 	"github.com/bingoohuang/godaemon"
 	"github.com/bingoohuang/golog"
 	"github.com/bingoohuang/gowormhole"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wormhole"
 	"github.com/pion/webrtc/v3"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/crypto/acme/autocert"
 	"nhooyr.io/websocket"
@@ -41,7 +38,7 @@ const (
 `
 	serviceWorkerPage = `You're not supposed to get this file or end up here.
 
-This is a dummy URL is used by GobWormhole to help web browsers
+This is a dummy URL is used by GoWormhole to help web browsers
 efficiently download files from a WebRTC connection. It should be
 handled entirely by a ServiceWorker running in your browser.
 
@@ -53,133 +50,10 @@ work, please file a bug report.
 )
 
 var (
-	rendezvousCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: "gowormhole",
-			Name:      "rendezvous_attempts",
-			Help:      "Number of attempts to rendezvous using the signalling server.",
-		},
-		[]string{"result"},
-	)
-	iceCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: "gowormhole",
-			Name:      "webrtc_attempts",
-			Help:      "Number of reported ICE results sliced by ICE method used.",
-		},
-		[]string{"result", "method"},
-	)
-	protocolErrorCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: "gowormhole",
-			Name:      "protocol_errors",
-			Help:      "Number of bad requests to the signalling server.",
-		},
-		[]string{"kind"},
-	)
-	slotsGuage = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: "gowormhole",
-			Name:      "busy_slots",
-			Help:      "Number of currently busy slots.",
-		},
-	)
-)
-
-func init() {
-	prometheus.MustRegister(rendezvousCounter)
-	prometheus.MustRegister(iceCounter)
-	prometheus.MustRegister(protocolErrorCounter)
-	prometheus.MustRegister(slotsGuage)
-}
-
-var (
 	turnUser    string
 	turnServer  string
 	stunServers []webrtc.ICEServer
 )
-
-type Slots struct {
-	m    map[string]chan *websocket.Conn
-	lock sync.RWMutex
-}
-
-func (r *Slots) Delete(slotKey string) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	delete(r.m, slotKey)
-	slotsGuage.Set(float64(len(r.m)))
-}
-
-// slots is a map of allocated slot numbers.
-var slots = Slots{m: make(map[string]chan *websocket.Conn)}
-
-func (r *Slots) GetAndDelete(slotKey string) (sc chan *websocket.Conn, ok bool) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	sc, ok = r.m[slotKey]
-	if !ok {
-		rendezvousCounter.WithLabelValues("nosuchslot").Inc()
-		return
-	}
-	delete(r.m, slotKey)
-	slotsGuage.Set(float64(len(slots.m)))
-	return
-}
-
-func (r *Slots) FreeSlot() (slotKey string, sc chan *websocket.Conn, ok bool) {
-	// Book a new slot.
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
-	newslot, ok := r.free()
-	if !ok {
-		rendezvousCounter.WithLabelValues("nomoreslots").Inc()
-		return
-	}
-	slotKey = newslot
-	sc = make(chan *websocket.Conn)
-	r.m[newslot] = sc
-	slotsGuage.Set(float64(len(r.m)))
-	return
-}
-
-// free tries to find an available numeric slot, favouring smaller numbers.
-// This assumes slots is locked.
-func (r *Slots) free() (slot string, ok bool) {
-	// Assuming varint encoding, we first try for one byte. That's 7 bits in varint.
-	for i := 0; i < 64; i++ {
-		s := strconv.Itoa(rand.Intn(1 << 7))
-		if _, ok := r.m[s]; !ok {
-			return s, true
-		}
-	}
-	// Then try for two bytes. 11 bits.
-	for i := 0; i < 1024; i++ {
-		s := strconv.Itoa(rand.Intn(1 << 11))
-		if _, ok := r.m[s]; !ok {
-			return s, true
-		}
-	}
-	// Then try for three bytes. 16 bits.
-	for i := 0; i < 2048; i++ {
-		s := strconv.Itoa(rand.Intn(1 << 16))
-		if _, ok := r.m[s]; !ok {
-			return s, true
-		}
-	}
-	// Then try for four bytes. 21 bits.
-	for i := 0; i < 2048; i++ {
-		s := strconv.Itoa(rand.Intn(1 << 21))
-		if _, ok := r.m[s]; !ok {
-			return s, true
-		}
-	}
-	// Give up.
-	return "", false
-}
 
 // turnServers return the configured TURN server with HMAC-based ephemeral
 // credentials generated as described in:
@@ -189,12 +63,11 @@ func turnServers() []webrtc.ICEServer {
 		return nil
 	}
 
-	userPass := strings.SplitN(turnUser, ":", 2)
+	username, credential := ss.Split2(turnUser, ss.WithSeps(":"))
 
 	return []webrtc.ICEServer{{
-		URLs:       []string{util.Prefix("turn:", util.AppendPort(turnServer, gowormhole.DefaultTurnPort))},
-		Username:   userPass[0],
-		Credential: userPass[1],
+		URLs:     []string{util.Prefix("turn:", util.AppendPort(turnServer, gowormhole.DefaultTurnPort))},
+		Username: username, Credential: credential,
 	}}
 }
 
@@ -211,6 +84,7 @@ func relay(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
+
 	if conn.Subprotocol() != wormhole.Protocol {
 		// Make sure we negotiated the right protocol, since "blank" is also a default one.
 		protocolErrorCounter.WithLabelValues("wrongversion").Inc()
@@ -219,111 +93,52 @@ func relay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), slotTimeout)
-
-	initMsg := struct {
-		Slot       string             `json:"slot,omitempty"`
-		ICEServers []webrtc.ICEServer `json:"iceServers,omitempty"`
-	}{}
-	initMsg.ICEServers = append(turnServers(), stunServers...)
+	initMsg := wormhole.InitMsg{ICEServers: append(turnServers(), stunServers...)}
+	slotKey := r.URL.Path[1:] // strip leading slash
 
 	var rconn *websocket.Conn
 
-	slotKey := r.URL.Path[1:] // strip leading slash
-
 	go func() {
-		if slotKey == "" {
-			// Book a new slot.
-			newSlot, c, ok := slots.FreeSlot()
-			if !ok {
-				_ = conn.Close(wormhole.CloseNoMoreSlots, "cannot allocate slots")
-				return
-			}
-			slotKey = newSlot
-			sc := c
-			initMsg.Slot = slotKey
-			buf, _ := json.Marshal(initMsg)
-			if err := conn.Write(ctx, websocket.MessageText, buf); err != nil {
-				log.Println(err)
-				slots.Delete(slotKey)
-				return
-			}
-
-		wait:
-			for {
-				select {
-				case <-ctx.Done():
-					rendezvousCounter.WithLabelValues("timeout").Inc()
+		if rc, err := joinPeers(ctx, slotKey, conn, initMsg); err != nil {
+			log.Printf("join peers failed: %v", err)
+			if se, ok := err.(*slotError); ok {
+				if se.CloseReason != "" {
+					_ = conn.Close(se.CloseCode, se.CloseReason)
 					slots.Delete(slotKey)
-					_ = conn.Close(wormhole.CloseSlotTimedOut, "timed out")
-					return
-				case <-time.After(30 * time.Second): // Do a WebSocket Ping every 30 seconds.
-					_ = conn.Ping(ctx)
-				case sc <- conn:
-					break wait
 				}
 			}
-			rconn = <-sc
-			rendezvousCounter.WithLabelValues("success").Inc()
-			return
+		} else {
+			rconn = rc
 		}
-
-		// Join an existing slot.
-		sc, ok := slots.GetAndDelete(slotKey)
-		if !ok {
-			_ = conn.Close(wormhole.CloseNoSuchSlot, "no such slot")
-			return
-		}
-		initMsg.Slot = slotKey
-		buf, _ := json.Marshal(initMsg)
-		if err = conn.Write(ctx, websocket.MessageText, buf); err != nil {
-			log.Println(err)
-			return
-		}
-		select {
-		case <-ctx.Done():
-			_ = conn.Close(wormhole.CloseSlotTimedOut, "timed out")
-		case rconn = <-sc:
-		}
-		sc <- conn
-		rendezvousCounter.WithLabelValues("success").Inc()
 	}()
 
 	defer cancel()
 	for {
 		msgType, p, err := conn.Read(ctx)
-		switch websocket.CloseStatus(err) {
-		case wormhole.CloseBadKey:
-			iceCounter.WithLabelValues("fail", "badkey").Inc()
-			if rconn != nil {
-				_ = rconn.Close(wormhole.CloseBadKey, "bad key")
-			}
-			return
-		case wormhole.CloseWebRTCFailed:
-			iceCounter.WithLabelValues("fail", "unknown").Inc()
-			return
-		case wormhole.CloseWebRTCSuccess:
-			iceCounter.WithLabelValues("success", "unknown").Inc()
-			return
-		case wormhole.CloseWebRTCSuccessDirect:
-			iceCounter.WithLabelValues("success", "direct").Inc()
-			return
-		case wormhole.CloseWebRTCSuccessRelay:
-			iceCounter.WithLabelValues("success", "relay").Inc()
-			return
-		}
 		if err != nil {
 			log.Printf("read error: %v", err)
-
-			iceCounter.WithLabelValues("unknown", "unknown").Inc()
-			if rconn != nil {
-				_ = rconn.Close(wormhole.ClosePeerHungUp, "peer hung up")
+			switch websocket.CloseStatus(err) {
+			case wormhole.CloseBadKey:
+				iceCounter.WithLabelValues("fail", "badkey").Inc()
+				closeConn(rconn, wormhole.CloseBadKey, "bad key")
+			case wormhole.CloseWebRTCFailed:
+				iceCounter.WithLabelValues("fail", "unknown").Inc()
+			case wormhole.CloseWebRTCSuccess:
+				iceCounter.WithLabelValues("success", "unknown").Inc()
+			case wormhole.CloseWebRTCSuccessDirect:
+				iceCounter.WithLabelValues("success", "direct").Inc()
+			case wormhole.CloseWebRTCSuccessRelay:
+				iceCounter.WithLabelValues("success", "relay").Inc()
+			default:
+				iceCounter.WithLabelValues("unknown", "unknown").Inc()
+				closeConn(rconn, wormhole.ClosePeerHungUp, "peer hung up")
 			}
+
 			return
 		}
 		if rconn == nil {
-			// We could synchronise with the rendezvous goroutine above and wait for
-			// B to connect, but receiving anything at this stage is a protocol violation,
-			// so we should just bail out.
+			// We could synchronise with the rendezvous goroutine above and wait for  B to connect,
+			// but receiving anything at this stage is a protocol violation, so we should just bail out.
 			return
 		}
 		if err := rconn.Write(ctx, msgType, p); err != nil {
@@ -333,9 +148,70 @@ func relay(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func signallingServerCmd(args ...string) {
-	rand.Seed(time.Now().UnixNano()) // for slot allocation
+func writeConn(ctx context.Context, c *websocket.Conn, initMsg wormhole.InitMsg) error {
+	buf, err := json.Marshal(initMsg)
+	if err != nil {
+		return NewSlotError(initMsg.Slot, wormhole.CloseBadKey, "", err)
+	}
 
+	if err := c.Write(ctx, websocket.MessageText, buf); err != nil {
+		return NewSlotError(initMsg.Slot, wormhole.CloseBadKey, "", err)
+	}
+
+	return nil
+}
+
+func closeConn(c *websocket.Conn, code websocket.StatusCode, reason string) {
+	if c != nil {
+		_ = c.Close(code, reason)
+	}
+}
+
+func joinPeers(ctx context.Context, slotKey string, conn *websocket.Conn, initMsg wormhole.InitMsg) (*websocket.Conn, error) {
+	sc, newSlotKey, exists := slots.Setup(slotKey)
+	initMsg.Slot = newSlotKey
+	initMsg.Exists = exists
+	if err := writeConn(ctx, conn, initMsg); err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		if err := waitPair(ctx, conn, sc, slotKey); err != nil {
+			return nil, err
+		}
+
+		return <-sc, nil
+	}
+
+	// Join an existing slot.
+	var rconn *websocket.Conn
+	select {
+	case <-ctx.Done():
+		return nil, NewSlotError(slotKey, wormhole.CloseSlotTimedOut, "timed out", nil)
+	case rconn = <-sc: // 收到对端连接
+	}
+
+	sc <- conn
+	rendezvousCounter.WithLabelValues("success").Inc()
+	return rconn, nil
+}
+
+func waitPair(ctx context.Context, conn *websocket.Conn, sc chan *websocket.Conn, slotKey string) error {
+	for {
+		select {
+		case <-ctx.Done():
+			rendezvousCounter.WithLabelValues("timeout").Inc()
+			return NewSlotError(slotKey, wormhole.CloseSlotTimedOut, "timed out", nil)
+		case <-time.After(30 * time.Second): // Do a WebSocket Ping every 30 seconds.
+			_ = conn.Ping(ctx)
+		case sc <- conn:
+			rendezvousCounter.WithLabelValues("success").Inc()
+			return nil
+		}
+	}
+}
+
+func signallingServerCmd(args ...string) {
 	f := flag.NewFlagSet(args[0], flag.ExitOnError)
 	f.Usage = func() {
 		_, _ = fmt.Fprintf(f.Output(), "run the gowormhole signalling server\n\n")
@@ -366,12 +242,7 @@ func signallingServerCmd(args ...string) {
 		log.Fatal("cannot use a TURN server without a secret")
 	}
 
-	if *pDaemon {
-		if p, _ := new(godaemon.Context).Reborn(); p != nil {
-			os.Exit(0)
-		}
-		log.Print("--- daemon started ---")
-	}
+	godaemon.Daemonize(*pDaemon)
 	golog.Setup()
 
 	for _, s := range strings.Split(*stun, ",") {
@@ -438,24 +309,6 @@ func signallingServerCmd(args ...string) {
 		HostPolicy: autocert.HostWhitelist(strings.Split(*hosts, ",")...),
 	}
 
-	ssrv := &http.Server{
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 60 * time.Minute,
-		IdleTimeout:  20 * time.Second,
-		Addr:         *httpsAddr,
-		Handler:      http.HandlerFunc(handler),
-		TLSConfig: &tls.Config{
-			MinVersion: tls.VersionTLS12,
-			CipherSuites: []uint16{
-				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-			},
-		},
-	}
 	srv := &http.Server{
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 60 * time.Minute,
@@ -464,16 +317,33 @@ func signallingServerCmd(args ...string) {
 		Handler:      m.HTTPHandler(http.HandlerFunc(handler)),
 	}
 
-	if *cert == "" && *key == "" {
-		ssrv.TLSConfig.GetCertificate = m.GetCertificate
-	}
-
 	errc := make(chan error)
 	if *debugAddr != "" {
 		http.Handle("/metrics", promhttp.Handler())
 		go func() { errc <- http.ListenAndServe(*debugAddr, nil) }()
 	}
 	if *httpsAddr != "" {
+		ssrv := &http.Server{
+			ReadTimeout:  10 * time.Second,
+			WriteTimeout: 60 * time.Minute,
+			IdleTimeout:  20 * time.Second,
+			Addr:         *httpsAddr,
+			Handler:      http.HandlerFunc(handler),
+			TLSConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				CipherSuites: []uint16{
+					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+					tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+					tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+				},
+			},
+		}
+		if *cert == "" && *key == "" {
+			ssrv.TLSConfig.GetCertificate = m.GetCertificate
+		}
 		srv.Handler = m.HTTPHandler(nil) // Enable redirect to https handler.
 		go func() { errc <- ssrv.ListenAndServeTLS(*cert, *key) }()
 	}

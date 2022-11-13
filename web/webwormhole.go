@@ -8,7 +8,6 @@
 package main
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"io"
@@ -123,10 +122,7 @@ func seal(_ js.Value, args []js.Value) interface{} {
 	clear := args[1].String()
 
 	var nonce [24]byte
-	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
-		return nil
-	}
-
+	randFull(nonce[:])
 	result := secretbox.Seal(nonce[:], []byte(clear), &nonce, &key)
 
 	return base64.URLEncoding.EncodeToString(result)

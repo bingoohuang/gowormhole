@@ -13,7 +13,6 @@ import (
 )
 
 func PrintQRCode(baseURL, code string) {
-	log.Printf("Wormhole code: %s\n", code)
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		return
@@ -108,6 +107,16 @@ func Prefix(prefix, addr string) string {
 	return If(strings.HasPrefix(addr, prefix), addr, prefix+addr)
 }
 
+// AppendPort appends a port to the address
+// e.g. AppendPort(`124.223.81.61:3478?transport=udp`, 3478) => 124.223.81.61:3478?transport=udp
+// e.g. AppendPort(`124.223.81.61?transport=udp`, 3478)      => 124.223.81.61:3478?transport=udp
+// e.g. AppendPort(`124.223.81.61`, 3478)                    => 124.223.81.61:3478
 func AppendPort(addr string, defaultPort int) string {
-	return Postfix(addr, fmt.Sprintf(":%d", defaultPort))
+	query := ""
+	if p := strings.Index(addr, "?"); p >= 0 {
+		query = addr[p:]
+		addr = addr[:p]
+	}
+	port := fmt.Sprintf(":%d", defaultPort)
+	return Postfix(addr, port) + query
 }

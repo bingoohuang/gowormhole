@@ -2,15 +2,13 @@
 package main
 
 import (
-	crand "crypto/rand"
+	"context"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"strconv"
 
-	"github.com/atotto/clipboard"
 	"github.com/bingoohuang/gg/pkg/v"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wordlist"
@@ -72,29 +70,18 @@ func main() {
 	cmd(flag.Args()...)
 }
 
-func newConn(code string, length int) *wormhole.Wormhole {
-	if code != "" {
-		return joinWormhole(code)
+func newConn(ctx context.Context, code string, length int) *wormhole.Wormhole {
+	slotKey, pass := "", ""
+	if code == "" {
+		pass = string(util.RandPass(length))
+	} else {
+		slot, pass1 := wordlist.Decode(code)
+		util.FatalfIf(pass1 == nil, "could not decode password")
+		slotKey = strconv.Itoa(slot)
+		pass = string(pass1)
 	}
 
-	return newWormhole(length)
-}
-
-func newWormhole(length int) *wormhole.Wormhole {
-	pass := make([]byte, length)
-	_, err := io.ReadFull(crand.Reader, pass)
-	util.FatalfIf(err != nil, "could not generate password: %v", err)
-
-	slotc := make(chan string)
-	go func() {
-		s := <-slotc
-		slot, err := strconv.Atoi(s)
-		util.FatalfIf(err != nil, "got invalid slot from signalling server: %v", s)
-		word := wordlist.Encode(slot, pass)
-		_ = clipboard.WriteAll(word)
-		util.PrintQRCode(sigserv, word)
-	}()
-	c, err := wormhole.New(string(pass), sigserv, slotc)
+	c, err := wormhole.Setup(ctx, slotKey, pass, sigserv)
 	util.FatalfIf(err == wormhole.ErrBadVersion,
 		"%s%s%s",
 		"the signalling server is running an incompatable version.\n",
@@ -103,20 +90,6 @@ func newWormhole(length int) *wormhole.Wormhole {
 	)
 
 	util.FatalfIf(err != nil, "could not dial: %v", err)
-	log.Printf("connected: %s\n", util.If(c.IsRelay(), "relay", "direct"))
-	return c
-}
-
-func joinWormhole(code string) *wormhole.Wormhole {
-	slot, pass := wordlist.Decode(code)
-	util.FatalfIf(pass == nil, "could not decode password")
-
-	c, err := wormhole.Join(strconv.Itoa(slot), string(pass), sigserv)
-	util.FatalfIf(err == wormhole.ErrBadVersion,
-		`the signalling server is running in an incompatible version
-try upgrading the client: go get github.com/bingoohuang/gowormhole/cmd/gowormhole`)
-
-	util.FatalfIf(err != nil, "could not dial: %v", err)
-	log.Printf("connected: %s\n", util.If(c.IsRelay(), "relay", "direct"))
+	log.Printf("connected: %s", util.If(c.IsRelay(), "relay", "direct"))
 	return c
 }

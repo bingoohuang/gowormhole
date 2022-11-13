@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -24,7 +25,7 @@ func pipeSubCmd(args ...string) {
 		set.Usage()
 		os.Exit(2)
 	}
-	c := newConn(set.Arg(0), *length)
+	c := newConn(context.TODO(), set.Arg(0), *length)
 
 	done := make(chan struct{})
 	// The recieve end of the pipe.

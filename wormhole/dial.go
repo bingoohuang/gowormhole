@@ -32,24 +32,19 @@ package wormhole
 
 import (
 	"context"
-	crand "crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"io"
 	"log"
-	"net/url"
+	"strconv"
 	"sync"
 	"time"
 
-	"filippo.io/cpace"
 	"github.com/bingoohuang/gowormhole/internal/util"
+	"github.com/bingoohuang/gowormhole/wordlist"
 	"github.com/pion/webrtc/v3"
-	"golang.org/x/crypto/hkdf"
-	"golang.org/x/crypto/nacl/secretbox"
 	"golang.org/x/net/proxy"
 	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
 )
 
 // Protocol is an identifier for the current signalling scheme. It's
@@ -116,6 +111,24 @@ func logf(format string, v ...interface{}) {
 	}
 }
 
+func Setup(ctx context.Context, slot, pass, sigserv string) (*Wormhole, error) {
+	ir, err := initPeerConnection(ctx, slot, pass, sigserv)
+	if err != nil {
+		return nil, err
+	}
+	if ir.Exists {
+		err = joinWormhole(ctx, ir, pass)
+	} else {
+		err = newWormhole(ctx, ir, pass)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return ir.Wormhole, nil
+}
+
 // A Wormhole is a WebRTC connection established via the WebWormhole signalling
 // protocol. It is wraps webrtc.PeerConnection and webrtc.DataChannel.
 //
@@ -134,6 +147,9 @@ type Wormhole struct {
 	// flushc is a condition variable to coordinate flushed state of the
 	// underlying channel.
 	flushc *sync.Cond
+
+	// code for the current
+	Code string
 }
 
 // Read writes a message to the default DataChannel.
@@ -172,8 +188,7 @@ func (c *Wormhole) Close() (err error) {
 		time.Sleep(time.Second) // eww.
 	}
 	tryclose := func(c io.Closer) {
-		e := c.Close()
-		if e != nil {
+		if e := c.Close(); e != nil {
 			err = e
 		}
 	}
@@ -185,8 +200,7 @@ func (c *Wormhole) Close() (err error) {
 
 func (c *Wormhole) open() {
 	var err error
-	c.rwc, err = c.d.Detach()
-	if err != nil {
+	if c.rwc, err = c.d.Detach(); err != nil {
 		c.err <- err
 		return
 	}
@@ -199,115 +213,55 @@ func (c *Wormhole) error(err error) {
 	c.err <- err
 }
 
-func readEncJSON(ws *websocket.Conn, key *[32]byte, v interface{}) error {
-	_, buf, err := ws.Read(context.TODO())
-	if err != nil {
-		return err
-	}
-	encrypted, err := base64.URLEncoding.DecodeString(string(buf))
-	if err != nil {
-		return err
-	}
-	var nonce [24]byte
-	copy(nonce[:], encrypted[:24])
-	jsonmsg, ok := secretbox.Open(nil, encrypted[24:], &nonce, key)
-	if !ok {
-		return ErrBadKey
-	}
-	return json.Unmarshal(jsonmsg, v)
-}
-
-func writeEncJSON(ws *websocket.Conn, key *[32]byte, v interface{}) error {
-	j, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	var nonce [24]byte
-	if _, err := io.ReadFull(crand.Reader, nonce[:]); err != nil {
-		return err
-	}
-	return ws.Write(context.TODO(), websocket.MessageText,
-		[]byte(base64.URLEncoding.EncodeToString(
-			secretbox.Seal(nonce[:], j, &nonce, key),
-		)),
-	)
-}
-
-func readBase64(ws *websocket.Conn) ([]byte, error) {
-	_, buf, err := ws.Read(context.TODO())
-	if err != nil {
-		return nil, err
-	}
-	return base64.URLEncoding.DecodeString(string(buf))
-}
-
-func writeBase64(ws *websocket.Conn, p []byte) error {
-	return ws.Write(context.TODO(), websocket.MessageText,
-		[]byte(base64.URLEncoding.EncodeToString(p)),
-	)
-}
-
-// readInitMsg reads the first message the signalling server sends over
-// the WebSocket connection, which has metadata includign assigned slot
-// and ICE servers to use.
-func readInitMsg(ws *websocket.Conn) (slot string, iceServers []webrtc.ICEServer, err error) {
-	msg := struct {
-		Slot       string             `json:"slot,omitempty"`
-		ICEServers []webrtc.ICEServer `json:"iceServers,omitempty"`
-	}{}
-
-	_, buf, err := ws.Read(context.TODO())
-	if err != nil {
-		return "", nil, err
-	}
-	err = json.Unmarshal(buf, &msg)
-	return msg.Slot, msg.ICEServers, err
+type InitMsg struct {
+	Exists     bool               `json:"exists,omitempty"`
+	Slot       string             `json:"slot,omitempty"`
+	ICEServers []webrtc.ICEServer `json:"iceServers,omitempty"`
 }
 
 // handleRemoteCandidates waits for remote candidate to trickle in. We close
 // the websocket when we get a successful connection so this should fail and
 // exit at some point.
-func (c *Wormhole) handleRemoteCandidates(ws *websocket.Conn, key *[32]byte) {
+func (c *Wormhole) handleRemoteCandidates(ctx context.Context, ws *websocket.Conn, key *[32]byte) {
 	for {
 		var candidate webrtc.ICECandidateInit
-		err := readEncJSON(ws, key, &candidate)
-		if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
+		if err := readEncJSON(ctx, ws, key, &candidate); err != nil {
+			if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+				logf("cannot read remote candidate: %v", err)
+			}
 			return
 		}
-		if err != nil {
-			logf("cannot read remote candidate: %v", err)
-			return
-		}
+
 		logf("received new remote candidate: %v", candidate.Candidate)
-		err = c.pc.AddICECandidate(candidate)
-		if err != nil {
+
+		if err := c.pc.AddICECandidate(candidate); err != nil {
 			logf("cannot add candidate: %v", err)
 			return
 		}
 	}
 }
 
-func (c *Wormhole) newPeerConnection(ice []webrtc.ICEServer) error {
+func (c *Wormhole) newPeerConnection(ice []webrtc.ICEServer) (err error) {
 	// Accessing pion/webrtc APIs like DataChannel.Detach() requires
 	// that we do this voodoo.
 	s := webrtc.SettingEngine{}
+
+	// https://github.com/pion/ice/blob/master/agent_config.go
+	// * disconnectedTimeout is the duration without network activity before a Agent is considered disconnected. Default is 5 Seconds
+	// * failedTimeout is the duration without network activity before a Agent is considered failed after disconnected. Default is 25 Seconds
+	// * keepAliveInterval is how often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
+
+	s.SetICETimeouts(5*time.Second, 10*time.Second, 2*time.Second)
 	s.DetachDataChannels()
 	s.SetICEProxyDialer(proxy.FromEnvironment())
 	rtcapi := webrtc.NewAPI(webrtc.WithSettingEngine(s))
 
-	var err error
-	c.pc, err = rtcapi.NewPeerConnection(webrtc.Configuration{
-		ICEServers: ice,
-	})
-	if err != nil {
+	if c.pc, err = rtcapi.NewPeerConnection(webrtc.Configuration{ICEServers: ice}); err != nil {
 		return err
 	}
 
 	sigh := true
-	c.d, err = c.pc.CreateDataChannel("data", &webrtc.DataChannelInit{
-		Negotiated: &sigh,
-		ID:         new(uint16),
-	})
+	c.d, err = c.pc.CreateDataChannel("data", &webrtc.DataChannelInit{Negotiated: &sigh, ID: new(uint16)})
 	if err != nil {
 		return err
 	}
@@ -325,10 +279,7 @@ func (c *Wormhole) IsRelay() bool {
 	stats := c.pc.GetStats()
 	for _, s := range stats {
 		pairstats, ok := s.(webrtc.ICECandidatePairStats)
-		if !ok {
-			continue
-		}
-		if !pairstats.Nominated {
+		if !ok || !pairstats.Nominated {
 			continue
 		}
 		local, ok := stats[pairstats.LocalCandidateID].(webrtc.ICECandidateStats)
@@ -357,264 +308,173 @@ func (c *Wormhole) IsRelay() bool {
 // The server generated slot identifier is written on slotc.
 //
 // If pc is nil it initialises ones using the default STUN server.
-func New(pass string, sigserv string, slotc chan string) (*Wormhole, error) {
-	c := &Wormhole{
-		opened: make(chan struct{}),
-		err:    make(chan error),
-		flushc: sync.NewCond(&sync.Mutex{}),
+func newWormhole(ctx context.Context, ir *initPeerConnectionResult, pass string) error {
+	key, err := exhangeKeySideB(ctx, ir.Ws, pass)
+	if err != nil {
+		return err
 	}
 
-	u, err := url.Parse(sigserv)
-	if err != nil {
-		return nil, err
-	}
-	u.Scheme = util.If(u.Scheme == "http" || u.Scheme == "ws", "ws", "wss")
-
-	wsaddr := u.String()
-
-	ws, _, err := websocket.Dial(context.TODO(), wsaddr, &websocket.DialOptions{
-		Subprotocols: []string{Protocol},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	assignedSlot, iceServers, err := readInitMsg(ws)
-	if websocket.CloseStatus(err) == CloseWrongProto {
-		return nil, ErrBadVersion
-	}
-	if err != nil {
-		return nil, err
-	}
-	logf("connected to signalling server, got slot: %v", assignedSlot)
-	slotc <- assignedSlot
-	err = c.newPeerConnection(iceServers)
-	if err != nil {
-		return nil, err
-	}
-
-	msgA, err := readBase64(ws)
-	if err != nil {
-		return nil, err
-	}
-	logf("got A pake msg (%v bytes)", len(msgA))
-
-	msgB, mk, err := cpace.Exchange(pass, cpace.NewContextInfo("", "", nil), msgA)
-	if err != nil {
-		return nil, err
-	}
-	key := [32]byte{}
-	_, err = io.ReadFull(hkdf.New(sha256.New, mk, nil, nil), key[:])
-	if err != nil {
-		return nil, err
-	}
-	err = writeBase64(ws, msgB)
-	if err != nil {
-		return nil, err
-	}
-	logf("have key, sent B pake msg (%v bytes)", len(msgB))
-
-	c.pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+	ir.Wormhole.pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
 		if candidate == nil {
 			return
 		}
-		err := writeEncJSON(ws, &key, candidate.ToJSON())
-		if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
-			return
-		}
-		if err != nil {
-			logf("cannot send local candidate: %v", err)
+
+		if err := writeEncJSON(ctx, ir.Ws, key, candidate.ToJSON()); err != nil {
+			if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+				logf("cannot send local candidate: %v", err)
+			}
 			return
 		}
 		logf("sent new local candidate: %v", candidate.String())
 	})
 
-	offer, err := c.pc.CreateOffer(nil)
+	offer, err := ir.Wormhole.pc.CreateOffer(nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	err = writeEncJSON(ws, &key, offer)
-	if err != nil {
-		return nil, err
+	if err := writeEncJSON(ctx, ir.Ws, key, offer); err != nil {
+		return err
 	}
-	err = c.pc.SetLocalDescription(offer)
-	if err != nil {
-		return nil, err
+	if err := ir.Wormhole.pc.SetLocalDescription(offer); err != nil {
+		return err
 	}
 	logf("sent offer")
 
 	var answer webrtc.SessionDescription
-	err = readEncJSON(ws, &key, &answer)
-	if websocket.CloseStatus(err) == CloseBadKey {
-		return nil, ErrBadKey
+	if err := readEncJSON(ctx, ir.Ws, key, &answer); err != nil {
+		if err == ErrBadKey {
+			// Close with the right status so the other side knows to quit immediately.
+			_ = ir.Ws.Close(CloseBadKey, "bad key")
+		}
+		return err
 	}
-	if err != nil {
-		return nil, err
-	}
-	err = c.pc.SetRemoteDescription(answer)
-	if err != nil {
-		return nil, err
+	if err := ir.Wormhole.pc.SetRemoteDescription(answer); err != nil {
+		return err
 	}
 	logf("got answer")
 
-	go c.handleRemoteCandidates(ws, &key)
-
-	select {
-	case <-c.opened:
-		relay := c.IsRelay()
-		logf("webrtc connection succeeded (relay: %v) closing signalling channel", relay)
-		_ = ws.Close(util.If[websocket.StatusCode](relay, CloseWebRTCSuccessRelay, CloseWebRTCSuccessDirect), "")
-
-	case err = <-c.err:
-		_ = ws.Close(CloseWebRTCFailed, "")
-	case <-time.After(30 * time.Second):
-		err = ErrTimedOut
-		_ = ws.Close(CloseWebRTCFailed, "timed out")
-	}
-	return c, err
+	return waitDataChannelOpen(ctx, ir.Wormhole, ir.Ws, key)
 }
 
-// Join performs the signalling handshake to join an existing slot.
+// joinWormhole performs the signalling handshake to join an existing slot.
 //
 // slot is used to synchronise with the remote peer on signalling server
 // sigserv, and pass is used as the PAKE password authenticate the WebRTC
 // offer and answer.
 //
 // If pc is nil it initialises ones using the default STUN server.
-func Join(slot, pass string, sigserv string) (*Wormhole, error) {
-	c := &Wormhole{
-		opened: make(chan struct{}),
-		err:    make(chan error),
-		flushc: sync.NewCond(&sync.Mutex{}),
-	}
-
-	u, err := url.Parse(sigserv)
+func joinWormhole(ctx context.Context, ir *initPeerConnectionResult, pass string) error {
+	key, err := exchangeKeySideA(ctx, ir.Ws, pass)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if u.Scheme == "http" || u.Scheme == "ws" {
-		u.Scheme = "ws"
-	} else {
-		u.Scheme = "wss"
-	}
-	u.Path += slot
-	wsaddr := u.String()
-
-	// Start the handshake.
-	ws, _, err := websocket.Dial(context.TODO(), wsaddr, &websocket.DialOptions{Subprotocols: []string{Protocol}})
-	if err != nil {
-		return nil, err
-	}
-
-	_, iceServers, err := readInitMsg(ws)
-	if websocket.CloseStatus(err) == CloseWrongProto {
-		return nil, ErrBadVersion
-	}
-	if err != nil {
-		return nil, err
-	}
-	logf("connected to signalling server on slot: %v", slot)
-	err = c.newPeerConnection(iceServers)
-	if err != nil {
-		return nil, err
-	}
-
-	// The identity arguments are to bind endpoint identities in PAKE. Cf. Unknown
-	// Key-Share Attack. https://tools.ietf.org/html/draft-ietf-mmusic-sdp-uks-03
-	//
-	// In the context of a program like magic-wormhole we do not have ahead of time
-	// information on the identity of the remote party. We only have the slot name,
-	// and sometimes even that at this stage. But that's okay, since:
-	//   a) The password is randomly generated and ephemeral.
-	//   b) A peer only gets one guess.
-	// An unintended destination is likely going to fail PAKE.
-
-	msgA, pake, err := cpace.Start(pass, cpace.NewContextInfo("", "", nil))
-	if err != nil {
-		return nil, err
-	}
-	err = writeBase64(ws, msgA)
-	if err != nil {
-		return nil, err
-	}
-	logf("sent A pake msg (%v bytes)", len(msgA))
-
-	msgB, err := readBase64(ws)
-	if websocket.CloseStatus(err) == CloseWrongProto {
-		return nil, ErrBadVersion
-	}
-	if err != nil {
-		return nil, err
-	}
-	mk, err := pake.Finish(msgB)
-	if err != nil {
-		return nil, err
-	}
-	key := [32]byte{}
-	_, err = io.ReadFull(hkdf.New(sha256.New, mk, nil, nil), key[:])
-	if err != nil {
-		return nil, err
-	}
-	logf("have key, got B msg (%v bytes)", len(msgB))
 
 	var offer webrtc.SessionDescription
-	err = readEncJSON(ws, &key, &offer)
-	if err == ErrBadKey {
-		// Close with the right status so the other side knows to quit immediately.
-		_ = ws.Close(CloseBadKey, "bad key")
-		return nil, err
-	}
-	if err != nil {
-		return nil, err
+	if err := readEncJSON(ctx, ir.Ws, key, &offer); err != nil {
+		if err == ErrBadKey {
+			// Close with the right status so the other side knows to quit immediately.
+			_ = ir.Ws.Close(CloseBadKey, "bad key")
+		}
+		return err
 	}
 
-	c.pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
+	ir.Wormhole.pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
 		if candidate == nil {
 			return
 		}
-		err := writeEncJSON(ws, &key, candidate.ToJSON())
-		if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
-			return
-		}
-		if err != nil {
-			logf("cannot send local candidate: %v", err)
+		if err := writeEncJSON(ctx, ir.Ws, key, candidate.ToJSON()); err != nil {
+			if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
+				logf("cannot send local candidate: %v", err)
+			}
 			return
 		}
 		logf("sent new local candidate: %v", candidate.String())
 	})
 
-	err = c.pc.SetRemoteDescription(offer)
-	if err != nil {
-		return nil, err
+	if err := ir.Wormhole.pc.SetRemoteDescription(offer); err != nil {
+		return err
 	}
 	logf("got offer")
-	answer, err := c.pc.CreateAnswer(nil)
+	answer, err := ir.Wormhole.pc.CreateAnswer(nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	err = writeEncJSON(ws, &key, answer)
-	if err != nil {
-		return nil, err
+	if err := writeEncJSON(ctx, ir.Ws, key, answer); err != nil {
+		return err
 	}
-	err = c.pc.SetLocalDescription(answer)
-	if err != nil {
-		return nil, err
+	if err := ir.Wormhole.pc.SetLocalDescription(answer); err != nil {
+		return err
 	}
 	logf("sent answer")
 
-	go c.handleRemoteCandidates(ws, &key)
+	return waitDataChannelOpen(ctx, ir.Wormhole, ir.Ws, key)
+}
 
+func waitDataChannelOpen(ctx context.Context, c *Wormhole, ws *websocket.Conn, key *[32]byte) error {
+	go c.handleRemoteCandidates(ctx, ws, key)
+
+	timeout := 15 * time.Second
 	select {
 	case <-c.opened:
 		relay := c.IsRelay()
+		code := util.If[websocket.StatusCode](relay, CloseWebRTCSuccessRelay, CloseWebRTCSuccessDirect)
+		_ = ws.Close(code, "")
 		logf("webrtc connection succeeded (relay: %v) closing signalling channel", relay)
-		_ = ws.Close(util.If[websocket.StatusCode](relay, CloseWebRTCSuccessRelay, CloseWebRTCSuccessDirect), "")
-
-	case err = <-c.err:
+	case err := <-c.err:
 		_ = ws.Close(CloseWebRTCFailed, "")
+		log.Printf("waitDataChannelOpen failed: %v", err)
+		return err
 	case <-time.After(30 * time.Second):
-		err = ErrTimedOut
 		_ = ws.Close(CloseWebRTCFailed, "timed out")
+		log.Printf("waitDataChannelOpen timed out in %s", timeout)
+		return ErrTimedOut
 	}
-	return c, err
+
+	return nil
+}
+
+type initPeerConnectionResult struct {
+	Ws       *websocket.Conn
+	Wormhole *Wormhole
+	Exists   bool
+}
+
+func initPeerConnection(ctx context.Context, slot, pass, sigserv string) (*initPeerConnectionResult, error) {
+	ws, err := dialWebsocket(ctx, slot, sigserv)
+	if err != nil {
+		return nil, err
+	}
+
+	// reads the first message the signalling server sends overthe WebSocket connection,
+	// which has metadata includign assigned slot and ICE servers to use.
+	initMsg := &InitMsg{}
+	if err := wsjson.Read(ctx, ws, initMsg); err != nil {
+		if websocket.CloseStatus(err) == CloseWrongProto {
+			err = ErrBadVersion
+		}
+		return nil, err
+	}
+
+	if initMsg.Exists {
+		logf("connected to signalling server on slot: %v", slot)
+	} else {
+		logf("connected to signalling server, got slot: %v", initMsg.Slot)
+	}
+
+	slotNum, err := strconv.Atoi(initMsg.Slot)
+	util.FatalfIf(err != nil, "got invalid slot from signalling server: %v", initMsg.Slot)
+
+	c := &Wormhole{
+		opened: make(chan struct{}),
+		err:    make(chan error),
+		flushc: sync.NewCond(&sync.Mutex{}),
+		Code:   wordlist.Encode(slotNum, []byte(pass)),
+	}
+	log.Printf("Wormhole code: %s", c.Code)
+
+	if err := c.newPeerConnection(initMsg.ICEServers); err != nil {
+		return nil, err
+	}
+
+	return &initPeerConnectionResult{Ws: ws, Wormhole: c, Exists: initMsg.Exists}, nil
 }

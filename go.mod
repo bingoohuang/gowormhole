@@ -9,9 +9,8 @@ go 1.19
 require (
 	filippo.io/cpace v0.0.0-20210101143347-24d601e2e469
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/atotto/clipboard v0.1.4
 	github.com/bingoohuang/gg v0.0.0-20221013063601-18ab764eda41
-	github.com/bingoohuang/godaemon v0.0.0-20220907040433-7f208f406639
+	github.com/bingoohuang/godaemon v0.0.0-20221104024058-3bf8b9130635
 	github.com/bingoohuang/golog v0.0.0-20221104075724-24493519ae6a
 	github.com/bingoohuang/pb v0.0.0-20221013134435-b2ba3ccc5001
 	github.com/creasty/defaults v1.6.1-0.20220411075939-bf90154c0c12
