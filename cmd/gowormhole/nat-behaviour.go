@@ -15,7 +15,7 @@ import (
 	"github.com/pion/stun"
 )
 
-func natSubCmd(args ...string) {
+func natSubCmd(sigserv string, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "nat behavior discovery\n\n")

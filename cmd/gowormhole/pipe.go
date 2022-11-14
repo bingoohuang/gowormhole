@@ -10,7 +10,7 @@ import (
 	"github.com/bingoohuang/gowormhole/internal/util"
 )
 
-func pipeSubCmd(args ...string) {
+func pipeSubCmd(sigserv string, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "netcat-like pipe\n\n")
@@ -25,7 +25,7 @@ func pipeSubCmd(args ...string) {
 		set.Usage()
 		os.Exit(2)
 	}
-	c := newConn(context.TODO(), set.Arg(0), *length)
+	c := newConn(context.TODO(), sigserv, set.Arg(0), *length, nil)
 
 	done := make(chan struct{})
 	// The recieve end of the pipe.

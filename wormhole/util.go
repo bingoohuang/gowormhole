@@ -29,30 +29,30 @@ func dialWebsocket(ctx context.Context, slot, sigserv string) (*websocket.Conn, 
 	return ws, err
 }
 
-func readEncJSON(ctx context.Context, ws *websocket.Conn, key *[32]byte, v interface{}) error {
+func readEncJSON(ctx context.Context, ws *websocket.Conn, key *[32]byte, v interface{}) ([]byte, error) {
 	encrypted, err := readBase64(ctx, ws)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var nonce [24]byte
 	copy(nonce[:], encrypted[:24])
-	jsonmsg, ok := secretbox.Open(nil, encrypted[24:], &nonce, key)
+	j, ok := secretbox.Open(nil, encrypted[24:], &nonce, key)
 	if !ok {
-		return ErrBadKey
+		return nil, ErrBadKey
 	}
-	return json.Unmarshal(jsonmsg, v)
+	return j, json.Unmarshal(j, v)
 }
 
-func writeEncJSON(ctx context.Context, ws *websocket.Conn, key *[32]byte, v interface{}) error {
+func writeEncJSON(ctx context.Context, ws *websocket.Conn, key *[32]byte, v interface{}) ([]byte, error) {
 	j, err := json.Marshal(v)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var nonce [24]byte
 	util.RandFull(nonce[:])
 	data := secretbox.Seal(nonce[:], j, &nonce, key)
-	return writeBase64(ctx, ws, data)
+	return j, writeBase64(ctx, ws, data)
 }
 
 func readBase64(ctx context.Context, ws *websocket.Conn) ([]byte, error) {

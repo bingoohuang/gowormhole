@@ -11,7 +11,7 @@ import (
 	"github.com/pion/webrtc/v3"
 )
 
-func publicIPSubCmd(args ...string) {
+func publicIPSubCmd(sigserv string, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "nat behavior discovery\n\n")

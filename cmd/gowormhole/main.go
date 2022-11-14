@@ -9,13 +9,14 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/bingoohuang/gg/pkg/ss"
 	"github.com/bingoohuang/gg/pkg/v"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wordlist"
 	"github.com/bingoohuang/gowormhole/wormhole"
 )
 
-var subcmds = map[string]func(args ...string){
+var subcmds = map[string]func(sigserv string, args ...string){
 	"publicip":    publicIPSubCmd,
 	"nat":         natSubCmd,
 	"send":        sendSubCmd,
@@ -27,10 +28,7 @@ var subcmds = map[string]func(args ...string){
 	"turn-client": turnClientSubCmd,
 }
 
-var (
-	verbose = true
-	sigserv = "http://gowormhole.d5k.co"
-)
+const DefaultSigserv = "http://gowormhole.d5k.co"
 
 func usage() {
 	util.Printf("gowormhole creates ephemeral pipes between computers.\n\n")
@@ -46,8 +44,8 @@ func usage() {
 
 func main() {
 	showVersion := flag.Bool("version", false, "show version and exit")
-	flag.BoolVar(&verbose, "verbose", util.LookupEnvOrBool("WW_VERBOSE", verbose), "verbose logging")
-	flag.StringVar(&sigserv, "signal", util.LookupEnvOr("WW_SIGSERV", sigserv), "signalling server to use")
+	verbose := flag.Bool("verbose", util.LookupEnvOrBool("GW_VERBOSE", true), "verbose logging")
+	sigserv := flag.String("signal", util.LookupEnvOr("GW_SIGSERV", ""), "signalling server to use")
 	flag.Usage = usage
 	flag.Parse()
 	if *showVersion {
@@ -59,18 +57,17 @@ func main() {
 		usage()
 		os.Exit(2)
 	}
-	if verbose {
-		wormhole.Verbose = true
-	}
+
+	wormhole.Verbose = *verbose
 	cmd, ok := subcmds[flag.Arg(0)]
 	if !ok {
 		flag.Usage()
 		os.Exit(2)
 	}
-	cmd(flag.Args()...)
+	cmd(*sigserv, flag.Args()...)
 }
 
-func newConn(ctx context.Context, code string, length int) *wormhole.Wormhole {
+func newConn(ctx context.Context, sigserv string, code string, length int, iceTimeouts *wormhole.ICETimeouts) *wormhole.Wormhole {
 	slotKey, pass := "", ""
 	if code == "" {
 		pass = string(util.RandPass(length))
@@ -81,7 +78,7 @@ func newConn(ctx context.Context, code string, length int) *wormhole.Wormhole {
 		pass = string(pass1)
 	}
 
-	c, err := wormhole.Setup(ctx, slotKey, pass, sigserv)
+	c, err := wormhole.Setup(ctx, slotKey, pass, ss.Or(sigserv, DefaultSigserv), iceTimeouts)
 	util.FatalfIf(err == wormhole.ErrBadVersion,
 		"%s%s%s",
 		"the signalling server is running an incompatable version.\n",

@@ -25,7 +25,7 @@ https://github.com/pion/turn/blob/master/examples/README.md
 $ ./gowormwhole turn -public-ip 127.0.0.1
 */
 
-func turnServerSubCmd(args ...string) {
+func turnServerSubCmd(sigserv string, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "run the gowormhole TURN server\n\n")

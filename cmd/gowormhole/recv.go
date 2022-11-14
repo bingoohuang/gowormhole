@@ -12,31 +12,35 @@ import (
 
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
+	"github.com/bingoohuang/gowormhole/wormhole"
 )
 
-func receiveSubCmd(args ...string) {
+func receiveSubCmd(sigserv string, args ...string) {
 	dir, code, passLength := parseFlags(args)
 	if err := receive(&receiveFileArg{
 		Code:         code,
 		SecretLength: passLength,
 		Dir:          dir,
 		Progress:     true,
+		Sigserv:      sigserv,
 	}); err != nil && err != io.EOF {
 		log.Fatalf("receiving failed: %v", err)
 	}
 }
 
 type receiveFileArg struct {
-	Code         string `json:"code"`
-	SecretLength int    `json:"secretLength" default:"2"`
-	Dir          string `json:"dir" default:"."`
-	Progress     bool   `json:"progress"`
+	Code         string                `json:"code"`
+	SecretLength int                   `json:"secretLength" default:"2"`
+	Dir          string                `json:"dir" default:"."`
+	Progress     bool                  `json:"progress"`
+	Sigserv      string                `json:"sigserv"`
+	IceTimeouts  *wormhole.ICETimeouts `json:"LiceTimeouts"`
 
 	pb util.ProgressBar
 }
 
 func receive(arg *receiveFileArg) error {
-	c := newConn(context.TODO(), arg.Code, arg.SecretLength)
+	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, arg.IceTimeouts)
 	arg.Code = c.Code
 	defer iox.Close(c)
 

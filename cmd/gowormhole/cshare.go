@@ -57,7 +57,7 @@ func RecvFiles(argJSON string) (handle C.uintptr_t) {
 		return
 	}
 
-	c := newConn(context.TODO(), arg.Code, arg.SecretLength)
+	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, arg.IceTimeouts)
 	result.c = c
 	arg.Code = c.Code
 	defer iox.Close(c)
@@ -110,7 +110,7 @@ func SendFiles(sendFileArgJSON string) (handle C.uintptr_t) {
 	result.wg = &sync.WaitGroup{}
 	arg.pb = result
 
-	c := newConn(context.TODO(), arg.Code, arg.SecretLength)
+	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, arg.IceTimeouts)
 	result.c = c
 	result.Code = c.Code
 

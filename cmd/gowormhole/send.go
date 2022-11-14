@@ -12,6 +12,7 @@ import (
 
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
+	"github.com/bingoohuang/gowormhole/wormhole"
 )
 
 func init() {
@@ -29,7 +30,7 @@ type header struct {
 	Type string `json:"type,omitempty"`
 }
 
-func sendSubCmd(args ...string) {
+func sendSubCmd(sigserv string, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "send files\n\n")
@@ -51,31 +52,34 @@ func sendSubCmd(args ...string) {
 		SecretLength: *length,
 		Files:        set.Args(),
 		Progress:     true,
+		Sigserv:      sigserv,
 	}); err != nil {
 		log.Fatalf("sendFiles failed: %v", err)
 	}
 }
 
 type sendFileArg struct {
-	Code         string   `json:"code"`
-	SecretLength int      `json:"secretLength" default:"2"`
-	Files        []string `json:"files"`
-	Progress     bool     `json:"progress"`
+	Code         string                `json:"code"`
+	SecretLength int                   `json:"secretLength" default:"2"`
+	Files        []string              `json:"files"`
+	Progress     bool                  `json:"progress"`
+	Sigserv      string                `json:"sigserv"`
+	IceTimeouts  *wormhole.ICETimeouts `json:"LiceTimeouts"`
 
 	pb util.ProgressBar
 }
 
-func sendFiles(args *sendFileArg) error {
-	c := newConn(context.TODO(), args.Code, args.SecretLength)
-	args.Code = c.Code
+func sendFiles(arg *sendFileArg) error {
+	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, arg.IceTimeouts)
+	arg.Code = c.Code
 	defer iox.Close(c)
 
-	return sendFilesByWormhole(c, args)
+	return sendFilesByWormhole(c, arg)
 }
 
-func sendFilesByWormhole(c io.Writer, args *sendFileArg) error {
-	pb := util.CreateProgressBar(args.pb, args.Progress)
-	for _, filename := range args.Files {
+func sendFilesByWormhole(c io.Writer, arg *sendFileArg) error {
+	pb := util.CreateProgressBar(arg.pb, arg.Progress)
+	for _, filename := range arg.Files {
 		if err := sendFile(c, filename, pb); err != nil {
 			return err
 		}
