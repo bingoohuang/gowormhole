@@ -211,7 +211,7 @@ func waitPair(ctx context.Context, conn *websocket.Conn, sc chan *websocket.Conn
 	}
 }
 
-func signallingServerCmd(sigserv string, args ...string) {
+func signallingServerCmd(ctx context.Context, sigserv string, args ...string) {
 	f := flag.NewFlagSet(args[0], flag.ExitOnError)
 	f.Usage = func() {
 		_, _ = fmt.Fprintf(f.Output(), "run the gowormhole signalling server\n\n")

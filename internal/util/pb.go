@@ -33,24 +33,24 @@ func NewProxyWriter(r io.Writer, pb ProgressBar) *Writer {
 }
 
 type ProgressBar interface {
-	Start(filename string, n int)
-	Add(n int)
+	Start(filename string, n uint64)
+	Add(n uint64)
 	Finish()
 }
 
 type NoopProgressBar struct{}
 
-func (n *NoopProgressBar) Start(string, int) {}
-func (n *NoopProgressBar) Add(int)           {}
-func (n *NoopProgressBar) Finish()           {}
+func (n *NoopProgressBar) Start(string, uint64) {}
+func (n *NoopProgressBar) Add(uint64)           {}
+func (n *NoopProgressBar) Finish()              {}
 
 type CliProgressBar struct {
 	bar *pb.ProgressBar
 }
 
-func (c *CliProgressBar) Start(filename string, n int) { c.bar = pb.Full.Start(n) }
-func (c *CliProgressBar) Add(n int)                    { c.bar.Add(n) }
-func (c *CliProgressBar) Finish()                      { c.bar.Finish() }
+func (c *CliProgressBar) Start(filename string, n uint64) { c.bar = pb.Full.Start64(int64(n)) }
+func (c *CliProgressBar) Add(n uint64)                    { c.bar.Add64(int64(n)) }
+func (c *CliProgressBar) Finish()                         { c.bar.Finish() }
 
 // Reader it's a wrapper for given reader, but with progress handle
 type Reader struct {
@@ -61,7 +61,7 @@ type Reader struct {
 // Read reads bytes from wrapped reader and add amount of bytes to progress bar
 func (r *Reader) Read(p []byte) (n int, err error) {
 	n, err = r.Reader.Read(p)
-	r.ProgressBar.Add(n)
+	r.ProgressBar.Add(uint64(n))
 	if err == io.EOF {
 		r.ProgressBar.Finish()
 	}
@@ -86,7 +86,7 @@ type Writer struct {
 // Write writes bytes to wrapped writer and add amount of bytes to progress bar
 func (r *Writer) Write(p []byte) (n int, err error) {
 	n, err = r.Writer.Write(p)
-	r.ProgressBar.Add(n)
+	r.ProgressBar.Add(uint64(n))
 	return
 }
 

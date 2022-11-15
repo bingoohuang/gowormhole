@@ -10,7 +10,7 @@ import (
 	"github.com/bingoohuang/gowormhole/internal/util"
 )
 
-func pipeSubCmd(sigserv string, args ...string) {
+func pipeSubCmd(ctx context.Context, sigserv string, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "netcat-like pipe\n\n")

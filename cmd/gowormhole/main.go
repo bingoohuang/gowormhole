@@ -16,7 +16,7 @@ import (
 	"github.com/bingoohuang/gowormhole/wormhole"
 )
 
-var subcmds = map[string]func(sigserv string, args ...string){
+var subcmds = map[string]func(ctx context.Context, sigserv string, args ...string){
 	"publicip":    publicIPSubCmd,
 	"nat":         natSubCmd,
 	"send":        sendSubCmd,
@@ -64,7 +64,7 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	cmd(*sigserv, flag.Args()...)
+	cmd(context.TODO(), *sigserv, flag.Args()...)
 }
 
 func newConn(ctx context.Context, sigserv string, code string, length int, iceTimeouts *wormhole.ICETimeouts) *wormhole.Wormhole {

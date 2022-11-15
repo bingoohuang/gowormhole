@@ -183,12 +183,11 @@ func (c *Wormhole) flushed() {
 // Close attempts to flush the DataChannel buffers then close it
 // and its PeerConnection.
 func (c *Wormhole) Close() (err error) {
-	logf("closing")
-	for c.d.BufferedAmount() != 0 {
-		// SetBufferedAmountLowThreshold does not seem to take effect
-		// when after the last Write().
-		time.Sleep(time.Second) // eww.
-	}
+	logf("Wormhole is closing")
+	//for c.d.BufferedAmount() != 0 {
+	//	// SetBufferedAmountLowThreshold does not seem to take effect  when after the last Write().
+	//	time.Sleep(time.Second) // eww.
+	//}
 	tryclose := func(c io.Closer) {
 		if e := c.Close(); e != nil {
 			err = e

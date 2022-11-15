@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,7 +16,7 @@ import (
 	"github.com/pion/stun"
 )
 
-func natSubCmd(sigserv string, args ...string) {
+func natSubCmd(ctx context.Context, sigserv string, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "nat behavior discovery\n\n")

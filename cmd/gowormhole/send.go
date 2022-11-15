@@ -2,13 +2,12 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"path/filepath"
+	"time"
 
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
@@ -24,13 +23,7 @@ const (
 	msgChunkSize = 32 << 10
 )
 
-type header struct {
-	Name string `json:"name,omitempty"`
-	Size int    `json:"size,omitempty"`
-	Type string `json:"type,omitempty"`
-}
-
-func sendSubCmd(sigserv string, args ...string) {
+func sendSubCmd(ctx context.Context, sigserv string, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "send files\n\n")
@@ -47,29 +40,47 @@ func sendSubCmd(sigserv string, args ...string) {
 		os.Exit(2)
 	}
 
-	if err := sendFiles(&sendFileArg{
+	if err := sendFilesRetry(&sendFileArg{
 		Code:         *code,
 		SecretLength: *length,
 		Files:        set.Args(),
 		Progress:     true,
 		Sigserv:      sigserv,
+		RetryTimes:   1,
 	}); err != nil {
 		log.Fatalf("sendFiles failed: %v", err)
 	}
 }
 
 type sendFileArg struct {
-	Code         string                `json:"code"`
-	SecretLength int                   `json:"secretLength" default:"2"`
-	Files        []string              `json:"files"`
-	Progress     bool                  `json:"progress"`
-	Sigserv      string                `json:"sigserv"`
-	IceTimeouts  *wormhole.ICETimeouts `json:"LiceTimeouts"`
+	Code           string                `json:"code"`
+	SecretLength   int                   `json:"secretLength" default:"2"`
+	Files          []string              `json:"files"`
+	Progress       bool                  `json:"progress"`
+	Sigserv        string                `json:"sigserv"`
+	IceTimeouts    *wormhole.ICETimeouts `json:"iceTimeouts"`
+	RetryTimes     int                   `json:"retryTimes" default:"10"`
+	Whoami         string                `json:"whoami"`
+	ResultFile     string                `json:"resultFile"`
+	ResultInterval time.Duration         `json:"resultInterval" default:"1s"`
 
 	pb util.ProgressBar
 }
 
-func sendFiles(arg *sendFileArg) error {
+func sendFilesRetry(arg *sendFileArg) error {
+	var err error
+	for i := 1; i <= arg.RetryTimes; i++ {
+		if err = sendFilesOnce(arg); err == nil {
+			return nil
+		}
+
+		log.Printf("send file failed: %v , retryTimes: %d", err, i)
+
+	}
+	return err
+}
+
+func sendFilesOnce(arg *sendFileArg) error {
 	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, arg.IceTimeouts)
 	arg.Code = c.Code
 	defer iox.Close(c)
@@ -77,10 +88,25 @@ func sendFiles(arg *sendFileArg) error {
 	return sendFilesByWormhole(c, arg)
 }
 
-func sendFilesByWormhole(c io.Writer, arg *sendFileArg) error {
-	pb := util.CreateProgressBar(arg.pb, arg.Progress)
-	for _, filename := range arg.Files {
-		if err := sendFile(c, filename, pb); err != nil {
+func sendFilesByWormhole(c io.ReadWriter, arg *sendFileArg) error {
+	meta, err := createSendFilesMeta(arg.Whoami, arg.Files)
+	if err != nil {
+		return fmt.Errorf("createSendFilesMeta failed: %w", err)
+	}
+	if _, err := sendJSON(c, meta); err != nil {
+		return fmt.Errorf("sendJSON SendFilesMeta failed: %w", err)
+	}
+
+	var rsp SendFilesMetaRsp
+	if err := recvJSON(c, &rsp); err != nil {
+		return fmt.Errorf("recvJSON failed: %w", err)
+	}
+
+	pbBar := util.CreateProgressBar(arg.pb, arg.Progress)
+
+	for _, file := range rsp.Files {
+		log.Printf("sending: %s, hash: %s .... ", file.FullName, file.Hash)
+		if err := file.sendFile(c, pbBar); err != nil {
 			return err
 		}
 	}
@@ -88,42 +114,55 @@ func sendFilesByWormhole(c io.Writer, arg *sendFileArg) error {
 	return nil
 }
 
-func sendFile(c io.Writer, filename string, pb util.ProgressBar) error {
-	f, err := os.Open(filename)
+func (file *FileMetaRsp) sendFile(c io.Writer, pb util.ProgressBar) error {
+	var localMeta FileMetaRsp
+	if err := createFileMetaRsp(file.FullName, file.Pos, &localMeta); err != nil {
+		log.Printf("createFileMeta failed: %v", err)
+	}
+	if localMeta.PosHash != file.PosHash {
+		file.Pos = 0 // hash 不一致，重新从头开始传输
+	}
+
+	j, err := sendJSON(c, file)
 	if err != nil {
-		return fmt.Errorf("open file %s failed: %w", filename, err)
+		return fmt.Errorf("sendJSON %s failed: %w", j, err)
+	}
+
+	pb.Start(file.FullName, file.Size)
+	defer pb.Finish()
+
+	pb.Add(file.Pos)
+	if file.Pos == file.Size {
+		return nil
+	}
+
+	return file.sendFilePos(c, pb)
+}
+
+func (file *FileMetaRsp) sendFilePos(c io.Writer, pb util.ProgressBar) error {
+	f, err := os.Open(file.FullName)
+	if err != nil {
+		return fmt.Errorf("open file %s failed: %w", file.FullName, err)
 	}
 	defer iox.Close(f)
 
-	info, err := f.Stat()
-	if err != nil {
-		return fmt.Errorf("stat file %s failed: %w", filename, err)
+	if offset := file.Pos; offset > 0 {
+		if _, err = f.Seek(int64(offset), io.SeekStart); err != nil {
+			return fmt.Errorf("seek %s to pos %d failed: %w", file.FullName)
+		}
 	}
 
-	baseFileName := filepath.Base(filepath.Clean(filename))
-	he := header{Name: baseFileName, Size: int(info.Size())}
-	h, err := json.Marshal(he)
-	if err != nil {
-		return fmt.Errorf("marshal header %s failed: %w", baseFileName, err)
-	}
-	if _, err := c.Write(h); err != nil {
-		return fmt.Errorf("write header %s failed: %w", h, err)
-	}
-
-	log.Printf("sending %s... ", filename)
-
-	pb.Start(filename, he.Size)
 	c = util.NewProxyWriter(c, pb)
-	n, err := io.CopyBuffer(c, f, make([]byte, msgChunkSize))
-	pb.Finish() // finish bar
+	remainSize := file.Size - file.Pos
+	r := io.LimitReader(f, int64(remainSize))
+	n, err := io.CopyBuffer(c, r, make([]byte, msgChunkSize))
 	if err != nil {
-		return fmt.Errorf("send file %s failed: %w", filename, err)
+		return fmt.Errorf("send file %s failed: %w", file.FullName, err)
 	}
 
-	if n != info.Size() {
-		return fmt.Errorf("EOF before sending all bytes: (%d/%d)", n, info.Size())
+	if uint64(n) != remainSize {
+		return fmt.Errorf("EOF before sending all bytes: (%d/%d)", n, remainSize)
 	}
 
-	log.Printf("send file %s done", filename)
 	return nil
 }

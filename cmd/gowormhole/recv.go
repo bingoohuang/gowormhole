@@ -2,56 +2,126 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"database/sql"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
-	"path/filepath"
+	"time"
 
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wormhole"
+	"github.com/creasty/defaults"
 )
 
-func receiveSubCmd(sigserv string, args ...string) {
+func receiveSubCmd(ctx context.Context, sigserv string, args ...string) {
 	dir, code, passLength := parseFlags(args)
-	if err := receive(&receiveFileArg{
+	if err := receiveRetry(ctx, &receiveFileArg{
 		Code:         code,
 		SecretLength: passLength,
 		Dir:          dir,
 		Progress:     true,
 		Sigserv:      sigserv,
+		RetryTimes:   1,
 	}); err != nil && err != io.EOF {
 		log.Fatalf("receiving failed: %v", err)
 	}
 }
 
 type receiveFileArg struct {
-	Code         string                `json:"code"`
-	SecretLength int                   `json:"secretLength" default:"2"`
-	Dir          string                `json:"dir" default:"."`
-	Progress     bool                  `json:"progress"`
-	Sigserv      string                `json:"sigserv"`
-	IceTimeouts  *wormhole.ICETimeouts `json:"LiceTimeouts"`
+	Code           string                `json:"code"`
+	SecretLength   int                   `json:"secretLength" default:"2"`
+	Dir            string                `json:"dir" default:"."`
+	Progress       bool                  `json:"progress"`
+	Sigserv        string                `json:"sigserv"`
+	IceTimeouts    *wormhole.ICETimeouts `json:"LiceTimeouts"`
+	RetryTimes     int                   `json:"retryTimes" default:"10"`
+	ResultFile     string                `json:"resultFile"`
+	ResultInterval time.Duration         `json:"resultInterval" default:"1s"`
+
+	DriverName     string `json:"driverName" default:"sqlite"`
+	DataSourceName string `json:"dataSourceName" default:"gowormhole.db"`
 
 	pb util.ProgressBar
+	db *sql.DB
 }
 
-func receive(arg *receiveFileArg) error {
+func receiveRetry(ctx context.Context, arg *receiveFileArg) error {
+	if err := defaults.Set(arg); err != nil {
+		log.Printf("defaults.Set %+v failed: %v", arg, err)
+	}
+
+	var err error
+
+	for i := 1; i <= arg.RetryTimes; i++ {
+		if err = receiveOnce(ctx, arg); err == nil {
+			return nil
+		}
+
+		log.Printf("receive failed: %v, retryTimes: %d", err, i)
+	}
+
+	return err
+}
+
+func receiveOnce(ctx context.Context, arg *receiveFileArg) error {
 	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, arg.IceTimeouts)
 	arg.Code = c.Code
 	defer iox.Close(c)
 
-	return receiveByWormhole(c, arg)
+	return receiveByWormhole(ctx, c, arg)
 }
 
-func receiveByWormhole(c io.Reader, arg *receiveFileArg) error {
+func receiveByWormhole(ctx context.Context, c io.ReadWriter, arg *receiveFileArg) error {
+	if err := InjectError("RECV_START"); err != nil {
+		return err
+	}
+
+	var meta SendFilesMeta
+	if err := recvJSON(c, &meta); err != nil {
+		return fmt.Errorf("recvJSON SendFilesMeta failed: %w", err)
+	}
+
+	db := dbm.GetDB(ctx, arg.DriverName, arg.DataSourceName)
+	defer dbm.Close(arg.DataSourceName, db)
+
+	var rspFiles []*FileMetaRsp
+	for _, f := range meta.Files {
+		rsp, err := f.LookupFilePos(ctx, db, arg.Dir, meta)
+		if err != nil {
+			return fmt.Errorf("receiveByWormhole failed: %w", err)
+		}
+
+		rspFiles = append(rspFiles, rsp)
+	}
+
+	if _, err := sendJSON(c, SendFilesMetaRsp{
+		Files: rspFiles,
+	}); err != nil {
+		return fmt.Errorf("sendJSON SendFilesMetaResponse failed: %w", err)
+	}
+
 	pb := util.CreateProgressBar(arg.pb, arg.Progress)
 	for {
-		if err := receiving(c, arg.Dir, pb); err != nil {
+		var file FileMetaRsp
+		if err := recvJSON(c, &file); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return fmt.Errorf("recvJSON SendFilesMeta failed: %w", err)
+		}
+
+		log.Printf("receiving: %s... ", file.RecvFullName)
+
+		if err := file.receiving(ctx, c, db, pb); err != nil {
 			return err
+		}
+
+		metaFile, _ := createFileMetaReq(file.RecvFullName)
+		if metaFile != nil {
+			log.Printf("receiving: %s hash: %s ", file.RecvFullName, metaFile.Hash)
 		}
 	}
 }
@@ -79,49 +149,41 @@ func parseFlags(args []string) (dir, code string, passLength int) {
 	return
 }
 
-func receiving(c io.Reader, directory string, pb util.ProgressBar) error {
-	// First message is the header. 1k should be enough.
-	buf := make([]byte, 1<<10)
-	n, err := c.Read(buf)
-	if err == io.EOF {
-		return io.EOF
+func (file *FileMetaRsp) receiving(ctx context.Context, c io.Reader, db *sql.DB, pb util.ProgressBar) error {
+	if file.Pos == file.Size {
+		pb.Start(file.RecvFullName, file.Size)
+		pb.Add(file.Pos)
+		pb.Finish()
+		return nil
 	}
 
+	f, err := os.OpenFile(file.RecvFullName, os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("read file header failed: %w", err)
-	}
-
-	var h header
-	if err := json.Unmarshal(buf[:n], &h); err != nil {
-		return fmt.Errorf("decode file header %s failed: %w", buf[:n], err)
-	}
-
-	name := filepath.Clean(h.Name)
-	f, err := os.Create(filepath.Join(directory, name))
-	if err != nil {
-		return fmt.Errorf("create output file %s failed: %w", h.Name, err)
+		return fmt.Errorf("create output file %s failed: %w", file, err)
 	}
 
 	defer iox.Close(f)
 
-	log.Printf("receiving %v... ", h.Name)
+	if file.Pos > 0 {
+		if _, err := f.Seek(int64(file.Pos), io.SeekStart); err != nil {
+			return fmt.Errorf("seek %s to offset %d failed: %w", file, file.Pos, err)
+		}
+	}
 
-	reader := io.LimitReader(c, int64(h.Size))
+	pb.Start(file.RecvFullName, file.Size)
+	pb.Add(file.Pos)
+	p := newSaveN(ctx, db, file.Hash, file.Pos, pb)
+	defer p.Finish()
 
-	pb.Start(h.Name, h.Size)                 // start new bar
-	reader = util.NewProxyReader(reader, pb) // create proxy reader
-
-	written, err := io.CopyBuffer(f, reader, make([]byte, msgChunkSize))
-	pb.Finish() // finish bar
-
+	remainSize := int64(file.Size - file.Pos)
+	written, err := io.CopyN(f, util.NewProxyReader(c, p), remainSize)
 	if err != nil {
-		return fmt.Errorf("create receive file  failed%s: %w", h.Name, err)
+		return fmt.Errorf("create receive file %+v failed: %w", *file, err)
 	}
 
-	if written != int64(h.Size) {
-		return fmt.Errorf("EOF before receiving all bytes: (%d/%d)", written, h.Size)
+	if written != remainSize {
+		return fmt.Errorf("EOF before receiving all bytes: (%d/%d)", written, remainSize)
 	}
 
-	log.Printf("receive file %s done", h.Name)
 	return nil
 }

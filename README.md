@@ -246,3 +246,35 @@ the PAKE?
  INFO: 2022/10/11 08:49:30 Response from 206.53.19.14:3479: (104 bytes)
  WARNING: 2022/10/11 08:49:30 => NAT filtering behavior: endpoint independent
  ```
+
+## Inject error
+
+注入环境变量：
+
+1. INJECT_ERR_POS 注入位置
+2. INJECT_ERR 注入错误信息
+
+已支持注入位置:
+
+1. RECV_START 在接受开始时
+
+示例：
+
+`INJECT_ERR_POS=RECV_START gowormhole recv debug-tint-limb`
+
+## c-shared 接口
+
+```go
+// SendFiles 发送文件. 请求 JSON 字符串.
+// e.g. {"code": "发送码", "files": ["1.jpg", "2.jpg"], "sync": false}
+// code: 发送码，为空时，会生成新码
+// files: 发送文件列表
+// sync: 是否同步发送（当前调用阻塞，直到文件传输完成，或者发生错误）
+//
+//export SendFiles
+func SendFiles(sendFileArgJSON string) (resultJSON string);
+
+//export RecvFiles
+func RecvFiles(argJSON string) (resultJSON string) {
+
+```
