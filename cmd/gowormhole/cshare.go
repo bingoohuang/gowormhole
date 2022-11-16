@@ -42,7 +42,7 @@ func GetVersion() string {
 //
 // retryTimes: 重试次数，默认 10
 // whoami: 我是谁，标记当前客户端信息
-// resultFile: 输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置次文件，例如: some.json，然后定时从此文件中读取进度结果
+// resultFile: 输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后使用独立线程定时从此文件中读取进度结果
 // resultInterval: 刷新进度间隔，默认1s.
 
 // 输出 JSON 文件内容示例：
@@ -71,7 +71,7 @@ func SendFiles(argJSON string) (resultJSON string) {
 //   - closeTimeout is maximum time wait to close WebWormhole
 //
 // retryTimes: 重试次数，默认 10
-// resultFile: 输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置次文件，例如: some.json，然后定时从此文件中读取进度结果
+// resultFile: 输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后独立线程定时从此文件中读取进度结果
 // resultInterval: 刷新进度间隔，默认1s.
 
 // 输出 JSON 文件内容示例：
