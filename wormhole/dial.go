@@ -32,6 +32,7 @@ package wormhole
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -407,7 +408,9 @@ func recvOffer(ctx context.Context, ir *initPeerConnectionResult, key *[32]byte)
 	if err := ir.Wormhole.pc.SetRemoteDescription(offer); err != nil {
 		return fmt.Errorf("SetRemoteDescription failed: %w", err)
 	}
-	logf("got offer: %s", offerJSON)
+	logf("got offer JSON: %s", offerJSON)
+	logf("got offer BASE64: %s", base64.StdEncoding.EncodeToString(offerJSON))
+
 	return nil
 }
 
@@ -420,11 +423,14 @@ func sendAnswer(ctx context.Context, ir *initPeerConnectionResult, key *[32]byte
 	if err != nil {
 		return fmt.Errorf("writeEncJSON failed: %w", err)
 	}
+
 	if err := ir.Wormhole.pc.SetLocalDescription(answer); err != nil {
 		return fmt.Errorf("SetLocalDescription failed: %w", err)
 	}
 
-	logf("sent answer: %s", answerJSON)
+	logf("sent answer JSON: %s", answerJSON)
+	logf("sent answer BASE64: %s", base64.StdEncoding.EncodeToString(answerJSON))
+
 	return nil
 }
 
