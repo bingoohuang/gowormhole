@@ -31,15 +31,15 @@ func receiveSubCmd(ctx context.Context, sigserv string, args ...string) {
 }
 
 type receiveFileArg struct {
-	Code           string                `json:"code"`
-	SecretLength   int                   `json:"secretLength" default:"2"`
-	Dir            string                `json:"dir" default:"."`
-	Progress       bool                  `json:"progress"`
-	Sigserv        string                `json:"sigserv"`
-	IceTimeouts    *wormhole.ICETimeouts `json:"LiceTimeouts"`
-	RetryTimes     int                   `json:"retryTimes" default:"10"`
-	ResultFile     string                `json:"resultFile"`
-	ResultInterval time.Duration         `json:"resultInterval" default:"1s"`
+	Code           string             `json:"code"`
+	SecretLength   int                `json:"secretLength" default:"2"`
+	Dir            string             `json:"dir" default:"."`
+	Progress       bool               `json:"progress"`
+	Sigserv        string             `json:"sigserv"`
+	Timeouts       *wormhole.Timeouts `json:"timeouts"`
+	RetryTimes     int                `json:"retryTimes" default:"10"`
+	ResultFile     string             `json:"resultFile"`
+	ResultInterval time.Duration      `json:"resultInterval" default:"1s"`
 
 	DriverName     string `json:"driverName" default:"sqlite"`
 	DataSourceName string `json:"dataSourceName" default:"gowormhole.db"`
@@ -67,7 +67,7 @@ func receiveRetry(ctx context.Context, arg *receiveFileArg) error {
 }
 
 func receiveOnce(ctx context.Context, arg *receiveFileArg) error {
-	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, arg.IceTimeouts)
+	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, arg.Timeouts)
 	arg.Code = c.Code
 	defer iox.Close(c)
 
@@ -80,8 +80,10 @@ func receiveByWormhole(ctx context.Context, c io.ReadWriter, arg *receiveFileArg
 	}
 
 	var meta SendFilesMeta
-	if err := recvJSON(c, &meta); err != nil {
+	if metaJSON, err := recvJSON(c, &meta); err != nil {
 		return fmt.Errorf("recvJSON SendFilesMeta failed: %w", err)
+	} else {
+		log.Printf("receiveByWormhole %s", metaJSON)
 	}
 
 	db := dbm.GetDB(ctx, arg.DriverName, arg.DataSourceName)
@@ -106,11 +108,13 @@ func receiveByWormhole(ctx context.Context, c io.ReadWriter, arg *receiveFileArg
 	pb := util.CreateProgressBar(arg.pb, arg.Progress)
 	for {
 		var file FileMetaRsp
-		if err := recvJSON(c, &file); err != nil {
+		if fileJSON, err := recvJSON(c, &file); err != nil {
 			if err == io.EOF {
 				return nil
 			}
 			return fmt.Errorf("recvJSON SendFilesMeta failed: %w", err)
+		} else {
+			log.Printf("receive file %s", fileJSON)
 		}
 
 		log.Printf("receiving: %s... ", file.RecvFullName)

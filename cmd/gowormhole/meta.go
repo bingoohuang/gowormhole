@@ -232,23 +232,23 @@ func sendJSON(c io.Writer, v interface{}) ([]byte, error) {
 	return j, err
 }
 
-func recvJSON(c io.Reader, v interface{}) error {
+func recvJSON(c io.Reader, v interface{}) ([]byte, error) {
 	// First message is the header. 10k should be enough.
 	buf := make([]byte, 1<<11)
 	n, err := c.Read(buf)
 	if err != nil {
 		if err == io.EOF {
-			return io.EOF
+			return nil, io.EOF
 		}
 
-		return fmt.Errorf("read file header failed: %w", err)
+		return nil, fmt.Errorf("read file header failed: %w", err)
 	}
 
 	if err := json.Unmarshal(buf[:n], v); err != nil {
-		return fmt.Errorf("json.Unmarshal %s failed: %w", buf[:n], err)
+		return nil, fmt.Errorf("json.Unmarshal %s failed: %w", buf[:n], err)
 	}
 
-	return nil
+	return buf[:n], nil
 }
 
 func (file *FileMetaReq) LookupFilePos(ctx context.Context, db *sql.DB, dir string, meta SendFilesMeta) (*FileMetaRsp, error) {

@@ -113,8 +113,8 @@ func logf(format string, v ...interface{}) {
 	}
 }
 
-func Setup(ctx context.Context, slot, pass, sigserv string, iceTimeouts *ICETimeouts) (*Wormhole, error) {
-	ir, err := initPeerConnection(ctx, slot, pass, sigserv, iceTimeouts)
+func Setup(ctx context.Context, slot, pass, sigserv string, timeouts *Timeouts) (*Wormhole, error) {
+	ir, err := initPeerConnection(ctx, slot, pass, sigserv, timeouts)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,8 @@ type Wormhole struct {
 	flushc *sync.Cond
 
 	// code for the current
-	Code string
+	Code     string
+	Timeouts *Timeouts
 }
 
 // Read writes a message to the default DataChannel.
@@ -184,10 +185,12 @@ func (c *Wormhole) flushed() {
 // and its PeerConnection.
 func (c *Wormhole) Close() (err error) {
 	logf("Wormhole is closing")
-	//for c.d.BufferedAmount() != 0 {
-	//	// SetBufferedAmountLowThreshold does not seem to take effect  when after the last Write().
-	//	time.Sleep(time.Second) // eww.
-	//}
+
+	startTime := time.Now()
+	for c.d.BufferedAmount() > 0 && time.Since(startTime) < c.Timeouts.CloseTimeout {
+		// SetBufferedAmountLowThreshold does not seem to take effect  when after the last Write().
+		time.Sleep(time.Second) // eww.
+	}
 	tryclose := func(c io.Closer) {
 		if e := c.Close(); e != nil {
 			err = e
@@ -247,25 +250,18 @@ func (c *Wormhole) handleRemoteCandidates(ctx context.Context, ws *websocket.Con
 // * failedTimeout is the duration without network activity before a Agent is considered failed after disconnected. Default is 25 Seconds
 // * keepAliveInterval is how often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
 
-type ICETimeouts struct {
+type Timeouts struct {
 	DisconnectedTimeout time.Duration `json:"disconnectedTimeout" default:"5s"`
 	FailedTimeout       time.Duration `json:"failedTimeout" default:"10s"`
 	KeepAliveInterval   time.Duration `json:"keepAliveInterval" default:"2s"`
+	// CloseTimeout set the timeout for the closing, see Wormhole.Close
+	CloseTimeout time.Duration `json:"closeTimeout" default:"10s"`
 }
 
-func (c *Wormhole) newPeerConnection(ice []webrtc.ICEServer, iceTimeouts *ICETimeouts) (err error) {
-	// Accessing pion/webrtc APIs like DataChannel.Detach() requires
-	// that we do this voodoo.
+func (c *Wormhole) newPeerConnection(ice []webrtc.ICEServer) (err error) {
+	// Accessing pion/webrtc APIs like DataChannel.Detach() requires that we do this voodoo.
 	s := webrtc.SettingEngine{}
-
-	if iceTimeouts == nil {
-		iceTimeouts = &ICETimeouts{
-			DisconnectedTimeout: 5 * time.Second,
-			FailedTimeout:       10 * time.Second,
-			KeepAliveInterval:   2 * time.Second,
-		}
-	}
-	s.SetICETimeouts(iceTimeouts.DisconnectedTimeout, iceTimeouts.FailedTimeout, iceTimeouts.KeepAliveInterval)
+	s.SetICETimeouts(c.Timeouts.DisconnectedTimeout, c.Timeouts.FailedTimeout, c.Timeouts.KeepAliveInterval)
 	s.DetachDataChannels()
 	s.SetICEProxyDialer(proxy.FromEnvironment())
 	rtcapi := webrtc.NewAPI(webrtc.WithSettingEngine(s))
@@ -477,7 +473,7 @@ type initPeerConnectionResult struct {
 	Exists   bool
 }
 
-func initPeerConnection(ctx context.Context, slot, pass, sigserv string, iceTimeouts *ICETimeouts) (*initPeerConnectionResult, error) {
+func initPeerConnection(ctx context.Context, slot, pass, sigserv string, timeouts *Timeouts) (*initPeerConnectionResult, error) {
 	ws, err := dialWebsocket(ctx, slot, sigserv)
 	if err != nil {
 		return nil, err
@@ -499,15 +495,25 @@ func initPeerConnection(ctx context.Context, slot, pass, sigserv string, iceTime
 	if err != nil {
 		return nil, fmt.Errorf("got invalid slot %q from signalling server", initMsg.Slot)
 	}
+
+	if timeouts == nil {
+		timeouts = &Timeouts{
+			DisconnectedTimeout: 5 * time.Second,
+			FailedTimeout:       10 * time.Second,
+			KeepAliveInterval:   2 * time.Second,
+			CloseTimeout:        10 * time.Second,
+		}
+	}
 	c := &Wormhole{
-		opened: make(chan struct{}),
-		err:    make(chan error),
-		flushc: sync.NewCond(&sync.Mutex{}),
-		Code:   wordlist.Encode(slotNum, []byte(pass)),
+		opened:   make(chan struct{}),
+		err:      make(chan error),
+		flushc:   sync.NewCond(&sync.Mutex{}),
+		Code:     wordlist.Encode(slotNum, []byte(pass)),
+		Timeouts: timeouts,
 	}
 	log.Printf("Wormhole code: %s", c.Code)
 
-	if err := c.newPeerConnection(initMsg.ICEServers, iceTimeouts); err != nil {
+	if err := c.newPeerConnection(initMsg.ICEServers); err != nil {
 		return nil, err
 	}
 

@@ -9,9 +9,9 @@ import (
 )
 
 func TestICETimeoutsDefaults(t *testing.T) {
-	var it ICETimeouts
+	var it Timeouts
 	defaults.Set(&it)
-	assert.Equal(t, ICETimeouts{
+	assert.Equal(t, Timeouts{
 		DisconnectedTimeout: 5 * time.Second,
 		FailedTimeout:       10 * time.Second,
 		KeepAliveInterval:   2 * time.Second,

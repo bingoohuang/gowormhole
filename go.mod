@@ -13,6 +13,7 @@ require (
 	github.com/bingoohuang/gg v0.0.0-20221013063601-18ab764eda41
 	github.com/bingoohuang/godaemon v0.0.0-20221104024058-3bf8b9130635
 	github.com/bingoohuang/golog v0.0.0-20221104075724-24493519ae6a
+	github.com/bingoohuang/jj v0.0.0-20221031031028-20d424a46b10
 	github.com/bingoohuang/pb v0.0.0-20221013134435-b2ba3ccc5001
 	github.com/creasty/defaults v1.6.1-0.20220411075939-bf90154c0c12
 	github.com/georgysavva/scany/v2 v2.0.0
@@ -30,9 +31,11 @@ require (
 )
 
 require (
+	github.com/Pallinder/go-randomdata v1.2.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
@@ -44,6 +47,7 @@ require (
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/pbnjay/pixfont v0.0.0-20200714042608-33b744692567 // indirect
 	github.com/pion/datachannel v1.5.2 // indirect
 	github.com/pion/dtls/v2 v2.1.5 // indirect
 	github.com/pion/ice/v2 v2.2.11 // indirect
