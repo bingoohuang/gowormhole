@@ -7,12 +7,10 @@ import (
 	"io"
 	"log"
 	"os"
-	"time"
 
+	"github.com/bingoohuang/gg/pkg/defaults"
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
-	"github.com/bingoohuang/gowormhole/wormhole"
-	"github.com/creasty/defaults"
 )
 
 func init() {
@@ -42,12 +40,14 @@ func sendSubCmd(ctx context.Context, sigserv string, args ...string) {
 	}
 
 	if err := sendFilesRetry(&sendFileArg{
-		Code:         *code,
-		SecretLength: *length,
-		Files:        set.Args(),
-		Progress:     true,
-		Sigserv:      sigserv,
-		RetryTimes:   1,
+		BaseArg: BaseArg{
+			Code:         *code,
+			SecretLength: *length,
+			Progress:     true,
+			Sigserv:      sigserv,
+			RetryTimes:   1,
+		},
+		Files: set.Args(),
 	}); err != nil {
 		log.Fatalf("sendFiles failed: %v", err)
 	}
@@ -61,18 +61,9 @@ func (a *sendFileArg) GetCode() string    { return a.Code }
 func (a *receiveFileArg) GetCode() string { return a.Code }
 
 type sendFileArg struct {
-	Code           string            `json:"code"`
-	SecretLength   int               `json:"secretLength" default:"2"`
-	Files          []string          `json:"files"`
-	Progress       bool              `json:"progress"`
-	Sigserv        string            `json:"sigserv"`
-	Timeouts       wormhole.Timeouts `json:"timeouts"`
-	RetryTimes     int               `json:"retryTimes" default:"10"`
-	Whoami         string            `json:"whoami"`
-	ResultFile     string            `json:"resultFile"`
-	ResultInterval time.Duration     `json:"resultInterval" default:"1s"`
-
-	pb util.ProgressBar
+	BaseArg `default:"{}"`
+	Files   []string `json:"files"`
+	Whoami  string   `json:"whoami"`
 }
 
 func sendFilesRetry(arg *sendFileArg) error {

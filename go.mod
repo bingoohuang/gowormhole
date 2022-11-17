@@ -15,7 +15,6 @@ require (
 	github.com/bingoohuang/golog v0.0.0-20221104075724-24493519ae6a
 	github.com/bingoohuang/jj v0.0.0-20221031031028-20d424a46b10
 	github.com/bingoohuang/pb v0.0.0-20221013134435-b2ba3ccc5001
-	github.com/creasty/defaults v1.6.1-0.20220411075939-bf90154c0c12
 	github.com/georgysavva/scany/v2 v2.0.0
 	github.com/go-playground/assert/v2 v2.0.1
 	github.com/pion/logging v0.2.2

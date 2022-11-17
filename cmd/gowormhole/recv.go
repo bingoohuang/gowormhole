@@ -10,30 +10,31 @@ import (
 	"os"
 	"time"
 
+	"github.com/bingoohuang/gg/pkg/defaults"
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wormhole"
-	"github.com/creasty/defaults"
 )
 
 func receiveSubCmd(ctx context.Context, sigserv string, args ...string) {
 	dir, code, passLength := parseFlags(args)
 	if err := receiveRetry(ctx, &receiveFileArg{
-		Code:         code,
-		SecretLength: passLength,
-		Dir:          dir,
-		Progress:     true,
-		Sigserv:      sigserv,
-		RetryTimes:   1,
+		BaseArg: BaseArg{
+			Code:         code,
+			SecretLength: passLength,
+			Progress:     true,
+			Sigserv:      sigserv,
+			RetryTimes:   1,
+		},
+		Dir: dir,
 	}); err != nil && err != io.EOF {
 		log.Fatalf("receiving failed: %v", err)
 	}
 }
 
-type receiveFileArg struct {
+type BaseArg struct {
 	Code           string            `json:"code"`
 	SecretLength   int               `json:"secretLength" default:"2"`
-	Dir            string            `json:"dir" default:"."`
 	Progress       bool              `json:"progress"`
 	Sigserv        string            `json:"sigserv"`
 	Timeouts       wormhole.Timeouts `json:"timeouts"`
@@ -41,10 +42,16 @@ type receiveFileArg struct {
 	ResultFile     string            `json:"resultFile"`
 	ResultInterval time.Duration     `json:"resultInterval" default:"1s"`
 
+	pb util.ProgressBar
+}
+
+type receiveFileArg struct {
+	BaseArg `default:"{}"`
+	Dir     string `json:"dir" default:"."`
+
 	DriverName     string `json:"driverName" default:"sqlite"`
 	DataSourceName string `json:"dataSourceName" default:"gowormhole.db"`
 
-	pb util.ProgressBar
 	db *sql.DB
 }
 

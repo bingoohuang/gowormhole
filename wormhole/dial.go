@@ -41,10 +41,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bingoohuang/gg/pkg/defaults"
 	"github.com/bingoohuang/gg/pkg/ss"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wordlist"
-	"github.com/creasty/defaults"
 	"github.com/pion/webrtc/v3"
 	"golang.org/x/net/proxy"
 	"nhooyr.io/websocket"

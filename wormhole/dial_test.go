@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/creasty/defaults"
+	"github.com/bingoohuang/gg/pkg/defaults"
 	"github.com/go-playground/assert/v2"
 )
 
@@ -19,12 +19,22 @@ func TestICETimeoutsDefaults(t *testing.T) {
 		RwTimeout:           10 * time.Second,
 	}, it)
 
-	var wrap Wrap
+	var (
+		wrap  Wrap
+		wrap2 Wrap2
+	)
 
 	defaults.Set(&wrap)
 	assert.Equal(t, it, wrap.Timeouts)
+
+	defaults.Set(&wrap2)
+	assert.Equal(t, it, *wrap2.Timeouts)
 }
 
 type Wrap struct {
-	Timeouts Timeouts
+	Timeouts Timeouts `default:"{}"`
+}
+
+type Wrap2 struct {
+	Timeouts *Timeouts `default:"{}"`
 }
