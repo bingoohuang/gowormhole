@@ -44,6 +44,7 @@ import (
 	"github.com/bingoohuang/gg/pkg/ss"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wordlist"
+	"github.com/creasty/defaults"
 	"github.com/pion/webrtc/v3"
 	"golang.org/x/net/proxy"
 	"nhooyr.io/websocket"
@@ -257,6 +258,8 @@ type Timeouts struct {
 	KeepAliveInterval   time.Duration `json:"keepAliveInterval" default:"2s"`
 	// CloseTimeout set the timeout for the closing, see Wormhole.Close
 	CloseTimeout time.Duration `json:"closeTimeout" default:"10s"`
+	// RwTimeout set the read/write timeout for data channel io.
+	RwTimeout time.Duration `json:"rwTimeout" default:"10s"`
 }
 
 func (c *Wormhole) newPeerConnection(ice []webrtc.ICEServer) (err error) {
@@ -270,6 +273,16 @@ func (c *Wormhole) newPeerConnection(ice []webrtc.ICEServer) (err error) {
 	if c.pc, err = rtcapi.NewPeerConnection(webrtc.Configuration{ICEServers: ice}); err != nil {
 		return err
 	}
+
+	// Set the handler for Peer connection state
+	// This will notify you when the peer has connected/disconnected
+	c.pc.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
+		log.Printf("Peer Connection State has changed: %s", s)
+
+		// Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
+		// Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
+		// Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
+	})
 
 	sigh := true
 	c.d, err = c.pc.CreateDataChannel("data", &webrtc.DataChannelInit{Negotiated: &sigh, ID: new(uint16)})
@@ -503,12 +516,8 @@ func initPeerConnection(ctx context.Context, slot, pass, sigserv string, timeout
 	}
 
 	if timeouts == nil {
-		timeouts = &Timeouts{
-			DisconnectedTimeout: 5 * time.Second,
-			FailedTimeout:       10 * time.Second,
-			KeepAliveInterval:   2 * time.Second,
-			CloseTimeout:        10 * time.Second,
-		}
+		timeouts = &Timeouts{}
+		defaults.Set(timeouts)
 	}
 	c := &Wormhole{
 		opened:   make(chan struct{}),
