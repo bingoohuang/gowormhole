@@ -85,5 +85,5 @@ func SendFiles(argJSON string) (resultJSON string) {
 
 //export RecvFiles
 func RecvFiles(argJSON string) (resultJSON string) {
-	return sendFiles(argJSON)
+	return recvFiles(argJSON)
 }

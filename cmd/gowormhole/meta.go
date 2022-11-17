@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -16,9 +15,10 @@ import (
 	"time"
 
 	"github.com/OneOfOne/xxhash"
+	"github.com/bingoohuang/gg/pkg/codec"
 	"github.com/bingoohuang/gg/pkg/goip"
 	"github.com/bingoohuang/gg/pkg/iox"
-	"github.com/georgysavva/scany/v2/sqlscan"
+	"github.com/bingoohuang/gg/pkg/sqx"
 )
 
 type FileMetaRsp struct {
@@ -150,13 +150,10 @@ func updateRecvTable(ctx context.Context, db *sql.DB, hash string, pos uint64, c
 
 func (file *FileMetaReq) LookupDB(ctx context.Context, db *sql.DB, dir string, meta SendFilesMeta) (*Recv, error) {
 	var recv Recv
-	err := sqlscan.Get(ctx, db, &recv, hashQuerySQL, file.Hash)
-	if err == nil {
+	sq := sqx.SQL{Q: hashQuerySQL, Ctx: ctx, Vars: sqx.Vars(file.Hash)}
+	if err := sq.Query(db, &recv); err == nil {
+		log.Printf("lookup db %s", codec.Json(recv))
 		return &recv, nil
-	}
-
-	if !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
 	}
 
 	r := Recv{

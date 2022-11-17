@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/bingoohuang/gg/pkg/codec"
 	"github.com/bingoohuang/gg/pkg/defaults"
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
@@ -68,7 +69,7 @@ type sendFileArg struct {
 
 func sendFilesRetry(arg *sendFileArg) error {
 	if err := defaults.Set(arg); err != nil {
-		log.Printf("defaults.Set: %w", err)
+		log.Printf("defaults.Set: %v", err)
 	}
 
 	var err error
@@ -88,7 +89,7 @@ func sendFilesOnce(arg *sendFileArg) error {
 	arg.Code = c.Code
 	defer iox.Close(c)
 
-	rw := util.TimeoutReadWriter(c, arg.Timeouts.RwTimeout)
+	rw := util.TimeoutReadWriter(c, arg.Timeouts.RwTimeout.D())
 	return sendFilesByWormhole(rw, arg)
 }
 
@@ -152,7 +153,7 @@ func (file *FileMetaRsp) sendFilePos(c io.Writer, pb util.ProgressBar) error {
 
 	if offset := file.Pos; offset > 0 {
 		if _, err = f.Seek(int64(offset), io.SeekStart); err != nil {
-			return fmt.Errorf("seek %s to pos %d failed: %w", file.FullName)
+			return fmt.Errorf("seek %s failed: %w", codec.Json(file), err)
 		}
 	}
 

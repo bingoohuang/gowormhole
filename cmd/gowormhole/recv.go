@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/bingoohuang/gg/pkg/codec"
 	"github.com/bingoohuang/gg/pkg/defaults"
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
@@ -78,7 +79,7 @@ func receiveOnce(ctx context.Context, arg *receiveFileArg) error {
 	arg.Code = c.Code
 	defer iox.Close(c)
 
-	rw := util.TimeoutReadWriter(c, arg.Timeouts.RwTimeout)
+	rw := util.TimeoutReadWriter(c, arg.Timeouts.RwTimeout.D())
 	return receiveByWormhole(ctx, rw, arg)
 }
 
@@ -171,14 +172,14 @@ func (file *FileMetaRsp) receiving(ctx context.Context, c io.Reader, db *sql.DB,
 
 	f, err := os.OpenFile(file.RecvFullName, os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("create output file %s failed: %w", file, err)
+		return fmt.Errorf("create output file %s failed: %w", codec.Json(file), err)
 	}
 
 	defer iox.Close(f)
 
 	if file.Pos > 0 {
 		if _, err := f.Seek(int64(file.Pos), io.SeekStart); err != nil {
-			return fmt.Errorf("seek %s to offset %d failed: %w", file, file.Pos, err)
+			return fmt.Errorf("seek %s  failed: %w", codec.Json(file), err)
 		}
 	}
 

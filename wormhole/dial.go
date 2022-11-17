@@ -189,7 +189,7 @@ func (c *Wormhole) Close() (err error) {
 	logf("Wormhole is closing")
 
 	startTime := time.Now()
-	for c.d.BufferedAmount() > 0 && time.Since(startTime) < c.Timeouts.CloseTimeout {
+	for c.d.BufferedAmount() > 0 && time.Since(startTime) < c.Timeouts.CloseTimeout.D() {
 		// SetBufferedAmountLowThreshold does not seem to take effect  when after the last Write().
 		time.Sleep(time.Second) // eww.
 	}
@@ -253,19 +253,19 @@ func (c *Wormhole) handleRemoteCandidates(ctx context.Context, ws *websocket.Con
 // * keepAliveInterval is how often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
 
 type Timeouts struct {
-	DisconnectedTimeout time.Duration `json:"disconnectedTimeout" default:"5s"`
-	FailedTimeout       time.Duration `json:"failedTimeout" default:"10s"`
-	KeepAliveInterval   time.Duration `json:"keepAliveInterval" default:"2s"`
+	DisconnectedTimeout util.Duration `json:"disconnectedTimeout" default:"5s"`
+	FailedTimeout       util.Duration `json:"failedTimeout" default:"10s"`
+	KeepAliveInterval   util.Duration `json:"keepAliveInterval" default:"2s"`
 	// CloseTimeout set the timeout for the closing, see Wormhole.Close
-	CloseTimeout time.Duration `json:"closeTimeout" default:"10s"`
+	CloseTimeout util.Duration `json:"closeTimeout" default:"10s"`
 	// RwTimeout set the read/write timeout for data channel io.
-	RwTimeout time.Duration `json:"rwTimeout" default:"10s"`
+	RwTimeout util.Duration `json:"rwTimeout" default:"10s"`
 }
 
 func (c *Wormhole) newPeerConnection(ice []webrtc.ICEServer) (err error) {
 	// Accessing pion/webrtc APIs like DataChannel.Detach() requires that we do this voodoo.
 	s := webrtc.SettingEngine{}
-	s.SetICETimeouts(c.Timeouts.DisconnectedTimeout, c.Timeouts.FailedTimeout, c.Timeouts.KeepAliveInterval)
+	s.SetICETimeouts(c.Timeouts.DisconnectedTimeout.D(), c.Timeouts.FailedTimeout.D(), c.Timeouts.KeepAliveInterval.D())
 	s.DetachDataChannels()
 	s.SetICEProxyDialer(proxy.FromEnvironment())
 	rtcapi := webrtc.NewAPI(webrtc.WithSettingEngine(s))
@@ -381,13 +381,14 @@ func onICECandidate(ctx context.Context, ir *initPeerConnectionResult, key *[32]
 		if candidate == nil {
 			return
 		}
+
+		logf("sent local candidate: %v", candidate.String())
 		if _, err := writeEncJSON(ctx, ir.Ws, key, candidate.ToJSON()); err != nil {
 			if websocket.CloseStatus(err) != websocket.StatusNormalClosure {
 				logf("cannot send local candidate: %v", err)
 			}
 			return
 		}
-		logf("sent local candidate: %v", candidate.String())
 	})
 }
 
