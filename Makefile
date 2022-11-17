@@ -39,6 +39,8 @@ endif
 so:
 	# New in Go 1.5, build Go dynamic lib
 	go build $(FLAGS) -o gowormhole$(DYLIB_EXT) -buildmode=c-shared ./cmd/gowormhole
+
+# windows 需要先安装 gcc，[tdm-gcc 安装](https://jmeubank.github.io/tdm-gcc/)
 dll:
 	git clone https://github.com/bingoohuang/gowormhole.git
 	cd gowormhole
