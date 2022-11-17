@@ -31,19 +31,22 @@ func GetVersion() string {
 
 // SendFiles 发送文件. 请求 JSON 字符串.
 // e.g. {"code": "发送码", "files": ["1.jpg", "2.jpg"]}
-// code: 发送码，为空时，会生成新码
-// files: 发送文件列表
-// sigserv: 信令服务器地址，默认 http://gowormhole.d5k.co
-// timeouts: 超时时间，默认 {"disconnectedTimeout": "5s", "failedTimeout": "10s", "keepAliveInterval": "2s"}
+// 参数说明
+// (注：可选参数，可以在 JSON 中直接不传递）
+// code:  可选。发送码，为空时，会生成新码
+// files: 必须。发送文件列表
+// sigserv:  可选。信令服务器地址，默认 http://gowormhole.d5k.co
+// timeouts:  可选。超时时间，默认 {"disconnectedTimeout": "5s", "failedTimeout": "10s", "keepAliveInterval": "2s"}
 //   - disconnectedTimeout is the duration without network activity before a Agent is considered disconnected. Default is 5 Seconds
 //   - failedTimeout is the duration without network activity before a Agent is considered failed after disconnected. Default is 25 Seconds
 //   - keepAliveInterval is how often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
 //   - closeTimeout is maximum time wait to close WebWormhole
+//   - rwTimeout is maximum read/write time to send file by WebWormhole
 //
-// retryTimes: 重试次数，默认 10
-// whoami: 我是谁，标记当前客户端信息
-// resultFile: 输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后使用独立线程定时从此文件中读取进度结果
-// resultInterval: 刷新进度间隔，默认1s.
+// retryTimes:  可选。重试次数，默认 10
+// whoami:  可选。我是谁，标记当前客户端信息
+// resultFile:  可选。输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后使用独立线程定时从此文件中读取进度结果
+// resultInterval:  可选。刷新进度间隔，默认1s.
 
 // 输出 JSON 文件内容示例：
 // {"code": "", "error":"", "progresses":[{"filename":"a.jpg", "size": 12345, "written": 1024, "finished": false}]}
@@ -61,18 +64,21 @@ func SendFiles(argJSON string) (resultJSON string) {
 
 // RecvFiles 接收文件. 请求 JSON 字符串.
 // e.g. {"code": "发送码", "dir": "."}
-// code: 发送码，为空时，会生成新码
-// dir: 接收文件存放目录
-// sigserv: 信令服务器地址，默认 http://gowormhole.d5k.co
-// iceTimeouts: 超时时间，默认 {"disconnectedTimeout": "5s", "failedTimeout": "10s", "keepAliveInterval": "2s"}
+// 参数说明
+// (注：可选参数，可以在 JSON 中直接不传递）
+// code: 可选。 发送码，为空时，会生成新码
+// dir: 必须。接收文件存放目录
+// sigserv:  可选。信令服务器地址，默认 http://gowormhole.d5k.co
+// iceTimeouts: 可选。 超时时间，默认 {"disconnectedTimeout": "5s", "failedTimeout": "10s", "keepAliveInterval": "2s"}
 //   - disconnectedTimeout is the duration without network activity before a Agent is considered disconnected. Default is 5 Seconds
 //   - failedTimeout is the duration without network activity before a Agent is considered failed after disconnected. Default is 25 Seconds
 //   - keepAliveInterval is how often the ICE Agent sends extra traffic if there is no activity, if media is flowing no traffic will be sent. Default is 2 seconds
 //   - closeTimeout is maximum time wait to close WebWormhole
+//   - rwTimeout is maximum read/write time to send file by WebWormhole
 //
-// retryTimes: 重试次数，默认 10
-// resultFile: 输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后独立线程定时从此文件中读取进度结果
-// resultInterval: 刷新进度间隔，默认1s.
+// retryTimes:  可选。重试次数，默认 10
+// resultFile:  可选。输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后独立线程定时从此文件中读取进度结果
+// resultInterval:  可选。 刷新进度间隔，默认1s.
 
 // 输出 JSON 文件内容示例：
 // {"code": "", "error":"", "progresses":[{"filename":"a.jpg", "size": 12345, "written": 1024, "finished": false}]}
