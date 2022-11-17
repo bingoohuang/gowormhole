@@ -403,7 +403,9 @@ func sendOffer(ctx context.Context, ir *initPeerConnectionResult, key *[32]byte)
 	if err := ir.Wormhole.pc.SetLocalDescription(offer); err != nil {
 		return fmt.Errorf("SetLocalDescription failed: %w", err)
 	}
-	logf("sent offer: %s", offerJSON)
+	logf("sent offer JSON: %s", offerJSON)
+	logf("sent offer BASE64: %s", base64.StdEncoding.EncodeToString(offerJSON))
+
 	return nil
 }
 
@@ -460,7 +462,8 @@ func recvAnwser(ctx context.Context, ir *initPeerConnectionResult, key *[32]byte
 	if err := ir.Wormhole.pc.SetRemoteDescription(answer); err != nil {
 		return fmt.Errorf("SetRemoteDescription failed: %w", err)
 	}
-	logf("got answer: %s", answerJSON)
+	logf("got answer JSON: %s", answerJSON)
+	logf("got answer BASE64: %s", base64.StdEncoding.EncodeToString(answerJSON))
 	return nil
 }
 
