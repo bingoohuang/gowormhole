@@ -15,5 +15,16 @@ func TestICETimeoutsDefaults(t *testing.T) {
 		DisconnectedTimeout: 5 * time.Second,
 		FailedTimeout:       10 * time.Second,
 		KeepAliveInterval:   2 * time.Second,
+		CloseTimeout:        10 * time.Second,
+		RwTimeout:           10 * time.Second,
 	}, it)
+
+	var wrap Wrap
+
+	defaults.Set(&wrap)
+	assert.Equal(t, it, wrap.Timeouts)
+}
+
+type Wrap struct {
+	Timeouts Timeouts
 }

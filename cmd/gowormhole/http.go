@@ -14,7 +14,6 @@ import (
 	"github.com/bingoohuang/godaemon"
 	"github.com/bingoohuang/golog"
 	"github.com/bingoohuang/jj"
-	"github.com/creasty/defaults"
 )
 
 func httpCmd(ctx context.Context, sigserv string, args ...string) {
@@ -79,10 +78,6 @@ func sendFiles(sendFileArgJSON string) (resultJSON string) {
 		return
 	}
 
-	if err := defaults.Set(&arg); err != nil {
-		log.Printf("defaults.Set: %w", err)
-	}
-
 	result.jsonFile = arg.ResultFile
 	result.interval = arg.ResultInterval
 	result.arg = &arg
@@ -110,10 +105,6 @@ func recvFiles(argJSON string) (resultJSON string) {
 	if err := json.Unmarshal([]byte(argJSON), &arg); err != nil {
 		result.Err = fmt.Errorf("json.Unmarshal %s: %w", argJSON, err)
 		return
-	}
-
-	if err := defaults.Set(&arg); err != nil {
-		log.Printf("defaults.Set: %w", err)
 	}
 
 	result.jsonFile = arg.ResultFile

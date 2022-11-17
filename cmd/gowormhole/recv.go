@@ -31,15 +31,15 @@ func receiveSubCmd(ctx context.Context, sigserv string, args ...string) {
 }
 
 type receiveFileArg struct {
-	Code           string             `json:"code"`
-	SecretLength   int                `json:"secretLength" default:"2"`
-	Dir            string             `json:"dir" default:"."`
-	Progress       bool               `json:"progress"`
-	Sigserv        string             `json:"sigserv"`
-	Timeouts       *wormhole.Timeouts `json:"timeouts"`
-	RetryTimes     int                `json:"retryTimes" default:"10"`
-	ResultFile     string             `json:"resultFile"`
-	ResultInterval time.Duration      `json:"resultInterval" default:"1s"`
+	Code           string            `json:"code"`
+	SecretLength   int               `json:"secretLength" default:"2"`
+	Dir            string            `json:"dir" default:"."`
+	Progress       bool              `json:"progress"`
+	Sigserv        string            `json:"sigserv"`
+	Timeouts       wormhole.Timeouts `json:"timeouts"`
+	RetryTimes     int               `json:"retryTimes" default:"10"`
+	ResultFile     string            `json:"resultFile"`
+	ResultInterval time.Duration     `json:"resultInterval" default:"1s"`
 
 	DriverName     string `json:"driverName" default:"sqlite"`
 	DataSourceName string `json:"dataSourceName" default:"gowormhole.db"`
@@ -67,11 +67,12 @@ func receiveRetry(ctx context.Context, arg *receiveFileArg) error {
 }
 
 func receiveOnce(ctx context.Context, arg *receiveFileArg) error {
-	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, arg.Timeouts)
+	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, &arg.Timeouts)
 	arg.Code = c.Code
 	defer iox.Close(c)
 
-	return receiveByWormhole(ctx, c, arg)
+	rw := util.TimeoutReadWriter(c, arg.Timeouts.RwTimeout)
+	return receiveByWormhole(ctx, rw, arg)
 }
 
 func receiveByWormhole(ctx context.Context, c io.ReadWriter, arg *receiveFileArg) error {

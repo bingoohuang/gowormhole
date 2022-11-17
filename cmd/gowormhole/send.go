@@ -12,6 +12,7 @@ import (
 	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wormhole"
+	"github.com/creasty/defaults"
 )
 
 func init() {
@@ -60,21 +61,25 @@ func (a *sendFileArg) GetCode() string    { return a.Code }
 func (a *receiveFileArg) GetCode() string { return a.Code }
 
 type sendFileArg struct {
-	Code           string             `json:"code"`
-	SecretLength   int                `json:"secretLength" default:"2"`
-	Files          []string           `json:"files"`
-	Progress       bool               `json:"progress"`
-	Sigserv        string             `json:"sigserv"`
-	Timeouts       *wormhole.Timeouts `json:"timeouts"`
-	RetryTimes     int                `json:"retryTimes" default:"10"`
-	Whoami         string             `json:"whoami"`
-	ResultFile     string             `json:"resultFile"`
-	ResultInterval time.Duration      `json:"resultInterval" default:"1s"`
+	Code           string            `json:"code"`
+	SecretLength   int               `json:"secretLength" default:"2"`
+	Files          []string          `json:"files"`
+	Progress       bool              `json:"progress"`
+	Sigserv        string            `json:"sigserv"`
+	Timeouts       wormhole.Timeouts `json:"timeouts"`
+	RetryTimes     int               `json:"retryTimes" default:"10"`
+	Whoami         string            `json:"whoami"`
+	ResultFile     string            `json:"resultFile"`
+	ResultInterval time.Duration     `json:"resultInterval" default:"1s"`
 
 	pb util.ProgressBar
 }
 
 func sendFilesRetry(arg *sendFileArg) error {
+	if err := defaults.Set(arg); err != nil {
+		log.Printf("defaults.Set: %w", err)
+	}
+
 	var err error
 	for i := 1; i <= arg.RetryTimes; i++ {
 		if err = sendFilesOnce(arg); err == nil {
@@ -88,11 +93,12 @@ func sendFilesRetry(arg *sendFileArg) error {
 }
 
 func sendFilesOnce(arg *sendFileArg) error {
-	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, arg.Timeouts)
+	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, &arg.Timeouts)
 	arg.Code = c.Code
 	defer iox.Close(c)
 
-	return sendFilesByWormhole(c, arg)
+	rw := util.TimeoutReadWriter(c, arg.Timeouts.RwTimeout)
+	return sendFilesByWormhole(rw, arg)
 }
 
 func sendFilesByWormhole(c io.ReadWriter, arg *sendFileArg) error {
