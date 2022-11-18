@@ -114,3 +114,5 @@ func CreateCode(argJSON *C.char) *C.char {
 	resultJSON := createCode(C.GoString(argJSON))
 	return C.CString(resultJSON)
 }
+
+// ref [How to call go from c with string (char *) as the parameter without making a copy](https://gist.github.com/helinwang/2c7bd2867ea5110f70e6431a7c80cd9b)
