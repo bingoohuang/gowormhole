@@ -85,6 +85,7 @@ func sendFiles(sendFileArgJSON string) (resultJSON string) {
 			log.Printf("error occured: %+v", result.Err)
 		}
 		j, _ := json.Marshal(result)
+		log.Printf("sendFiles result: %s", j)
 		resultJSON = string(j)
 	}()
 
@@ -126,6 +127,7 @@ func createCode(argJSON string) (resultJSON string) {
 		}
 
 		j, _ := json.Marshal(result)
+		log.Printf("createCode result: %s", j)
 		resultJSON = string(j)
 	}()
 
@@ -161,6 +163,7 @@ func recvFiles(argJSON string) (resultJSON string) {
 		}
 
 		j, _ := json.Marshal(result)
+		log.Printf("recvFiles result: %s", j)
 		resultJSON = string(j)
 	}()
 

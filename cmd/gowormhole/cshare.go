@@ -1,17 +1,14 @@
 package main
 
-import "C"
-import (
-	"encoding/json"
-	"github.com/bingoohuang/gg/pkg/v"
-)
-
 // #include <stdint.h>
 // #include <stdlib.h>
 import "C"
 
 import (
+	"encoding/json"
 	"unsafe"
+
+	"github.com/bingoohuang/gg/pkg/v"
 )
 
 // GetVersion 获得版本号信息，返回 JSON 字符串
