@@ -5,7 +5,6 @@ import "C"
 
 import (
 	"encoding/json"
-
 	"github.com/bingoohuang/gg/pkg/v"
 )
 
@@ -13,7 +12,7 @@ import (
 // e.g. {"gitCommit": "master-96c5683@2022-11-14T13:18:13+08:00", "buildTime": "2022-11-15T20:12:20+0800", "goVersion": "go1.19.2_darwin/amd64", "appVersion": ""appVersion""}
 //
 //export GetVersion
-func GetVersion() string {
+func GetVersion() *C.char {
 	ver, _ := json.Marshal(struct {
 		GitCommit  string `json:"gitCommit"`
 		BuildTime  string `json:"buildTime"`
@@ -26,7 +25,7 @@ func GetVersion() string {
 		AppVersion: v.AppVersion,
 	})
 
-	return string(ver)
+	return C.CString(string(ver))
 }
 
 // SendFiles 发送文件. 请求 JSON 字符串.
@@ -59,8 +58,8 @@ func GetVersion() string {
 // finished 是否已经传输完成
 
 //export SendFiles
-func SendFiles(argJSON string) *C.char {
-	resultJSON := sendFiles(argJSON)
+func SendFiles(argJSON *C.char) *C.char {
+	resultJSON := sendFiles(C.GoString(argJSON))
 	return C.CString(resultJSON)
 }
 
@@ -93,8 +92,8 @@ func SendFiles(argJSON string) *C.char {
 // finished 是否已经传输完成
 
 //export RecvFiles
-func RecvFiles(argJSON string) *C.char {
-	resultJSON := recvFiles(argJSON)
+func RecvFiles(argJSON *C.char) *C.char {
+	resultJSON := recvFiles(C.GoString(argJSON))
 	return C.CString(resultJSON)
 }
 
@@ -111,7 +110,7 @@ func RecvFiles(argJSON string) *C.char {
 // error: 错误信息
 
 //export CreateCode
-func CreateCode(argJSON string) *C.char {
-	resultJSON := createCode(argJSON)
+func CreateCode(argJSON *C.char) *C.char {
+	resultJSON := createCode(C.GoString(argJSON))
 	return C.CString(resultJSON)
 }
