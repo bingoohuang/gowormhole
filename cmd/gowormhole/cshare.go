@@ -1,19 +1,24 @@
 package main
 
+import "C"
+import (
+	"encoding/json"
+	"github.com/bingoohuang/gg/pkg/v"
+)
+
 // #include <stdint.h>
+// #include <stdlib.h>
 import "C"
 
 import (
-	"encoding/json"
-
-	"github.com/bingoohuang/gg/pkg/v"
+	"unsafe"
 )
 
 // GetVersion 获得版本号信息，返回 JSON 字符串
 // e.g. {"gitCommit": "master-96c5683@2022-11-14T13:18:13+08:00", "buildTime": "2022-11-15T20:12:20+0800", "goVersion": "go1.19.2_darwin/amd64", "appVersion": ""appVersion""}
 //
 //export GetVersion
-func GetVersion() *C.char {
+func GetVersion(outParam **C.char, outLen *C.int) int {
 	ver, _ := json.Marshal(struct {
 		GitCommit  string `json:"gitCommit"`
 		BuildTime  string `json:"buildTime"`
@@ -26,7 +31,10 @@ func GetVersion() *C.char {
 		AppVersion: v.AppVersion,
 	})
 
-	return C.CString(string(ver))
+	resultJSON := string(ver)
+	*outParam = C.CString(resultJSON)
+	*outLen = C.int(len(resultJSON))
+	return 0
 }
 
 // SendFiles 发送文件. 请求 JSON 字符串.
@@ -59,9 +67,11 @@ func GetVersion() *C.char {
 // finished 是否已经传输完成
 //
 //export SendFiles
-func SendFiles(argJSON *C.char) *C.char {
+func SendFiles(argJSON *C.char, outParam **C.char, outLen *C.int) int {
 	resultJSON := sendFiles(C.GoString(argJSON))
-	return C.CString(resultJSON)
+	*outParam = C.CString(resultJSON)
+	*outLen = C.int(len(resultJSON))
+	return 0
 }
 
 // RecvFiles 接收文件. 请求 JSON 字符串.
@@ -93,9 +103,11 @@ func SendFiles(argJSON *C.char) *C.char {
 // finished 是否已经传输完成
 //
 //export RecvFiles
-func RecvFiles(argJSON *C.char) *C.char {
+func RecvFiles(argJSON *C.char, outParam **C.char, outLen *C.int) int {
 	resultJSON := recvFiles(C.GoString(argJSON))
-	return C.CString(resultJSON)
+	*outParam = C.CString(resultJSON)
+	*outLen = C.int(len(resultJSON))
+	return 0
 }
 
 // CreateCode 创建文件传输短码. 请求 JSON 字符串.
@@ -111,9 +123,19 @@ func RecvFiles(argJSON *C.char) *C.char {
 // error: 错误信息
 //
 //export CreateCode
-func CreateCode(argJSON *C.char) *C.char {
+func CreateCode(argJSON *C.char, outParam **C.char, outLen *C.int) int {
 	resultJSON := createCode(C.GoString(argJSON))
-	return C.CString(resultJSON)
+	*outParam = C.CString(resultJSON)
+	*outLen = C.int(len(resultJSON))
+	return 0
+}
+
+// Free 释放返回字符串指针.
+//
+//export Free
+func Free(cstr *C.char) {
+	C.free(unsafe.Pointer(cstr))
 }
 
 // ref [How to call go from c with string (char *) as the parameter without making a copy](https://gist.github.com/helinwang/2c7bd2867ea5110f70e6431a7c80cd9b)
+// C# 调用 Go 版 DLL https://blog.51cto.com/u_15067242/3959200
