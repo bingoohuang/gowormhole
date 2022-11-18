@@ -5,6 +5,7 @@ import "C"
 
 import (
 	"encoding/json"
+
 	"github.com/bingoohuang/gg/pkg/v"
 )
 
@@ -47,7 +48,7 @@ func GetVersion() *C.char {
 // whoami:  可选。我是谁，标记当前客户端信息
 // resultFile:  可选。输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后使用独立线程定时从此文件中读取进度结果
 // resultInterval:  可选。刷新进度间隔，默认1s.
-
+//
 // 输出 JSON 文件内容示例：
 // {"code": "", "error":"", "progresses":[{"filename":"a.jpg", "size": 12345, "written": 1024, "finished": false}]}
 // code: 传输短码
@@ -56,7 +57,7 @@ func GetVersion() *C.char {
 // size: 文件大小
 // sent: 已发送大小
 // finished 是否已经传输完成
-
+//
 //export SendFiles
 func SendFiles(argJSON *C.char) *C.char {
 	resultJSON := sendFiles(C.GoString(argJSON))
@@ -81,7 +82,7 @@ func SendFiles(argJSON *C.char) *C.char {
 // retryTimes:  可选。重试次数，默认 10
 // resultFile:  可选。输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后独立线程定时从此文件中读取进度结果
 // resultInterval:  可选。 刷新进度间隔，默认1s.
-
+//
 // 输出 JSON 文件内容示例：
 // {"code": "", "error":"", "progresses":[{"filename":"a.jpg", "size": 12345, "written": 1024, "finished": false}]}
 // code: 传输短码
@@ -90,7 +91,7 @@ func SendFiles(argJSON *C.char) *C.char {
 // size: 文件大小
 // sent: 已接收大小
 // finished 是否已经传输完成
-
+//
 //export RecvFiles
 func RecvFiles(argJSON *C.char) *C.char {
 	resultJSON := recvFiles(C.GoString(argJSON))
@@ -103,12 +104,12 @@ func RecvFiles(argJSON *C.char) *C.char {
 // (注：可选参数，可以在 JSON 中直接不传递）
 // bearer:  必须。信令服务器授权令牌码
 // sigserv:  可选。信令服务器地址，默认 http://gowormhole.d5k.co
-
+//
 // 输出 JSON 文件内容示例：
 // {"code": "", "error":""}
 // code: 传输短码
 // error: 错误信息
-
+//
 //export CreateCode
 func CreateCode(argJSON *C.char) *C.char {
 	resultJSON := createCode(C.GoString(argJSON))
