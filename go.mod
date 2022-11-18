@@ -16,6 +16,7 @@ require (
 	github.com/bingoohuang/jj v0.0.0-20221031031028-20d424a46b10
 	github.com/bingoohuang/pb v0.0.0-20221013134435-b2ba3ccc5001
 	github.com/go-playground/assert/v2 v2.0.1
+	github.com/go-resty/resty/v2 v2.7.0
 	github.com/pion/logging v0.2.2
 	github.com/pion/stun v0.3.6-0.20220524134636-7e647ef6201c
 	github.com/pion/turn/v2 v2.0.8

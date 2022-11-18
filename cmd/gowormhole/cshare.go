@@ -30,9 +30,10 @@ func GetVersion() string {
 }
 
 // SendFiles 发送文件. 请求 JSON 字符串.
-// e.g. {"code": "发送码", "files": ["1.jpg", "2.jpg"]}
+// e.g. {"bearer":"token", "code": "发送码", "files": ["1.jpg", "2.jpg"]}
 // 参数说明
 // (注：可选参数，可以在 JSON 中直接不传递）
+// bearer:  必须。信令服务器授权令牌码
 // code:  可选。发送码，为空时，会生成新码
 // files: 必须。发送文件列表
 // sigserv:  可选。信令服务器地址，默认 http://gowormhole.d5k.co
@@ -50,7 +51,7 @@ func GetVersion() string {
 
 // 输出 JSON 文件内容示例：
 // {"code": "", "error":"", "progresses":[{"filename":"a.jpg", "size": 12345, "written": 1024, "finished": false}]}
-// code: 传输码
+// code: 传输短码
 // error: 错误信息
 // filename: 文件名
 // size: 文件大小
@@ -58,14 +59,16 @@ func GetVersion() string {
 // finished 是否已经传输完成
 
 //export SendFiles
-func SendFiles(argJSON string) (resultJSON string) {
-	return sendFiles(argJSON)
+func SendFiles(argJSON string) *C.char {
+	resultJSON := sendFiles(argJSON)
+	return C.CString(resultJSON)
 }
 
 // RecvFiles 接收文件. 请求 JSON 字符串.
-// e.g. {"code": "发送码", "dir": "."}
+// e.g. {"bearer":"token", "code": "发送码", "dir": "."}
 // 参数说明
 // (注：可选参数，可以在 JSON 中直接不传递）
+// bearer:  必须。信令服务器授权令牌码
 // code: 可选。 发送码，为空时，会生成新码
 // dir: 必须。接收文件存放目录
 // sigserv:  可选。信令服务器地址，默认 http://gowormhole.d5k.co
@@ -82,7 +85,7 @@ func SendFiles(argJSON string) (resultJSON string) {
 
 // 输出 JSON 文件内容示例：
 // {"code": "", "error":"", "progresses":[{"filename":"a.jpg", "size": 12345, "written": 1024, "finished": false}]}
-// code: 传输码
+// code: 传输短码
 // error: 错误信息
 // filename: 文件名
 // size: 文件大小
@@ -90,6 +93,25 @@ func SendFiles(argJSON string) (resultJSON string) {
 // finished 是否已经传输完成
 
 //export RecvFiles
-func RecvFiles(argJSON string) (resultJSON string) {
-	return recvFiles(argJSON)
+func RecvFiles(argJSON string) *C.char {
+	resultJSON := recvFiles(argJSON)
+	return C.CString(resultJSON)
+}
+
+// CreateCode 创建文件传输短码. 请求 JSON 字符串.
+// e.g. {"bearer":"token", "code": "发送码", "dir": "."}
+// 参数说明
+// (注：可选参数，可以在 JSON 中直接不传递）
+// bearer:  必须。信令服务器授权令牌码
+// sigserv:  可选。信令服务器地址，默认 http://gowormhole.d5k.co
+
+// 输出 JSON 文件内容示例：
+// {"code": "", "error":""}
+// code: 传输短码
+// error: 错误信息
+
+//export CreateCode
+func CreateCode(argJSON string) *C.char {
+	resultJSON := createCode(argJSON)
+	return C.CString(resultJSON)
 }

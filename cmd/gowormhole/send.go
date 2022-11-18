@@ -33,6 +33,8 @@ func sendSubCmd(ctx context.Context, sigserv string, args ...string) {
 	}
 	length := set.Int("length", 2, "length of generated secret")
 	code := set.String("code", "", "use a wormhole code instead of generating one")
+	pBearer := set.String("bearer", "", "Bearer authentication")
+
 	_ = set.Parse(args[1:])
 
 	if set.NArg() < 1 {
@@ -42,6 +44,7 @@ func sendSubCmd(ctx context.Context, sigserv string, args ...string) {
 
 	if err := sendFilesRetry(&sendFileArg{
 		BaseArg: BaseArg{
+			Bearer:       *pBearer,
 			Code:         *code,
 			SecretLength: *length,
 			Progress:     true,
@@ -85,7 +88,7 @@ func sendFilesRetry(arg *sendFileArg) error {
 }
 
 func sendFilesOnce(arg *sendFileArg) error {
-	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, &arg.Timeouts)
+	c := newConn(context.TODO(), arg.Sigserv, arg.Bearer, arg.Code, arg.SecretLength, &arg.Timeouts)
 	arg.Code = c.Code
 	defer iox.Close(c)
 

@@ -31,8 +31,15 @@ func (s slotError) Error() string {
 
 var _ error = (*slotError)(nil)
 
+type SlotItem struct {
+	SlotKey  string
+	C        chan *websocket.Conn
+	Exists   bool
+	Reserved bool
+}
+
 type Slots struct {
-	m    map[string]chan *websocket.Conn
+	m    map[string]*SlotItem
 	lock sync.RWMutex
 }
 
@@ -45,34 +52,43 @@ func (r *Slots) Delete(slotKey string) {
 }
 
 // slots is a map of allocated slot numbers.
-var slots = Slots{m: make(map[string]chan *websocket.Conn)}
+var slots = Slots{m: make(map[string]*SlotItem)}
 
-func (r *Slots) Setup(slotKey string) (sc chan *websocket.Conn, newSlotKey string, exists bool) {
+func (r *Slots) Setup(slotKey string, reserving bool) (*SlotItem, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	newSlotKey = slotKey
-
-	sc, exists = r.m[slotKey]
+	item, exists := r.m[slotKey]
 	if !exists {
 		if slotKey == "" {
 			if slotKey, _ = r.free(); slotKey == "" {
 				rendezvousCounter.WithLabelValues("nomoreslots").Inc()
-				return
+				return nil, fmt.Errorf("no more slots available")
 			}
-			newSlotKey = slotKey
 		}
 
-		sc = make(chan *websocket.Conn)
-		r.m[slotKey] = sc
+		item = &SlotItem{
+			SlotKey:  slotKey,
+			C:        make(chan *websocket.Conn),
+			Reserved: reserving,
+		}
+
+		r.m[slotKey] = item
 		slotsGuage.Set(float64(len(r.m)))
 		rendezvousCounter.WithLabelValues("nosuchslot").Inc()
-		return
+		return item, nil
 	}
 
-	delete(r.m, slotKey)
-	slotsGuage.Set(float64(len(slots.m)))
-	return
+	if item.Reserved {
+		item.Reserved = false
+	} else {
+		delete(r.m, slotKey)
+		item.Exists = true
+
+		slotsGuage.Set(float64(len(slots.m)))
+	}
+
+	return item, nil
 }
 
 // free tries to find an available numeric slot, favouring smaller numbers.

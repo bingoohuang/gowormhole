@@ -18,9 +18,10 @@ import (
 )
 
 func receiveSubCmd(ctx context.Context, sigserv string, args ...string) {
-	dir, code, passLength := parseFlags(args)
+	dir, code, bearer, passLength := parseFlags(args)
 	if err := receiveRetry(ctx, &receiveFileArg{
 		BaseArg: BaseArg{
+			Bearer:       bearer,
 			Code:         code,
 			SecretLength: passLength,
 			Progress:     true,
@@ -34,6 +35,7 @@ func receiveSubCmd(ctx context.Context, sigserv string, args ...string) {
 }
 
 type BaseArg struct {
+	Bearer         string            `json:"bearer"`
 	Code           string            `json:"code"`
 	SecretLength   int               `json:"secretLength" default:"2"`
 	Progress       bool              `json:"progress"`
@@ -75,7 +77,7 @@ func receiveRetry(ctx context.Context, arg *receiveFileArg) error {
 }
 
 func receiveOnce(ctx context.Context, arg *receiveFileArg) error {
-	c := newConn(context.TODO(), arg.Sigserv, arg.Code, arg.SecretLength, &arg.Timeouts)
+	c := newConn(context.TODO(), arg.Sigserv, arg.Bearer, arg.Code, arg.SecretLength, &arg.Timeouts)
 	arg.Code = c.Code
 	defer iox.Close(c)
 
@@ -139,7 +141,7 @@ func receiveByWormhole(ctx context.Context, c io.ReadWriter, arg *receiveFileArg
 	}
 }
 
-func parseFlags(args []string) (dir, code string, passLength int) {
+func parseFlags(args []string) (dir, code, bearer string, passLength int) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "receive files\n\n")
@@ -149,6 +151,7 @@ func parseFlags(args []string) (dir, code string, passLength int) {
 	}
 	length := set.Int("length", 2, "length of generated secret, if generating")
 	directory := set.String("dir", ".", "directory to put downloaded files")
+	pBearer := set.String("bearer", "", "Bearer authentication")
 	_ = set.Parse(args[1:])
 
 	if set.NArg() > 1 {
@@ -159,6 +162,7 @@ func parseFlags(args []string) (dir, code string, passLength int) {
 	dir = *directory
 	code = set.Arg(0)
 	passLength = *length
+	bearer = *pBearer
 	return
 }
 

@@ -19,13 +19,15 @@ func pipeSubCmd(ctx context.Context, sigserv string, args ...string) {
 		set.PrintDefaults()
 	}
 	length := set.Int("length", 2, "length of generated secret, if generating")
+	pBearer := set.String("bearer", "", "Bearer authentication")
+
 	_ = set.Parse(args[1:])
 
 	if set.NArg() > 1 {
 		set.Usage()
 		os.Exit(2)
 	}
-	c := newConn(context.TODO(), sigserv, set.Arg(0), *length, nil)
+	c := newConn(context.TODO(), sigserv, *pBearer, set.Arg(0), *length, nil)
 
 	done := make(chan struct{})
 	// The recieve end of the pipe.

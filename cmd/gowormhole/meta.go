@@ -150,7 +150,7 @@ func updateRecvTable(ctx context.Context, db *sql.DB, hash string, pos uint64, c
 
 func (file *FileMetaReq) LookupDB(ctx context.Context, db *sql.DB, dir string, meta SendFilesMeta) (*Recv, error) {
 	var recv Recv
-	sq := sqx.SQL{Q: hashQuerySQL, Ctx: ctx, Vars: sqx.Vars(file.Hash)}
+	sq := sqx.SQL{Q: hashQuerySQL, Ctx: ctx, Vars: sqx.Vars(file.Hash), NoLog: true}
 	if err := sq.Query(db, &recv); err == nil {
 		log.Printf("lookup db %s", codec.Json(recv))
 		return &recv, nil

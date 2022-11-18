@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"net/url"
 
 	"github.com/bingoohuang/gg/pkg/ss"
@@ -12,7 +13,7 @@ import (
 	"nhooyr.io/websocket"
 )
 
-func dialWebsocket(ctx context.Context, slot, sigserv string) (*websocket.Conn, error) {
+func dialWebsocket(ctx context.Context, slot, sigserv, bearer string) (*websocket.Conn, error) {
 	u, err := url.Parse(sigserv)
 	if err != nil {
 		return nil, err
@@ -24,8 +25,11 @@ func dialWebsocket(ctx context.Context, slot, sigserv string) (*websocket.Conn, 
 	wsaddr := u.String()
 
 	// Start the handshake.
-	dialOptions := &websocket.DialOptions{Subprotocols: []string{Protocol}}
-	ws, _, err := websocket.Dial(ctx, wsaddr, dialOptions)
+	d := &websocket.DialOptions{
+		Subprotocols: []string{Protocol},
+		HTTPHeader:   http.Header{"Authorization": {"Bearer " + bearer}},
+	}
+	ws, _, err := websocket.Dial(ctx, wsaddr, d)
 	return ws, err
 }
 

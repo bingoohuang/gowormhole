@@ -68,7 +68,7 @@ func main() {
 	cmd(context.TODO(), *sigserv, flag.Args()...)
 }
 
-func newConn(ctx context.Context, sigserv string, code string, length int, timeouts *wormhole.Timeouts) *wormhole.Wormhole {
+func newConn(ctx context.Context, sigserv, bearer string, code string, length int, timeouts *wormhole.Timeouts) *wormhole.Wormhole {
 	slotKey, pass := "", ""
 	if code == "" {
 		pass = string(util.RandPass(length))
@@ -79,7 +79,7 @@ func newConn(ctx context.Context, sigserv string, code string, length int, timeo
 		pass = string(pass1)
 	}
 
-	c, err := wormhole.Setup(ctx, slotKey, pass, ss.Or(sigserv, DefaultSigserv), timeouts)
+	c, err := wormhole.Setup(ctx, slotKey, pass, ss.Or(sigserv, DefaultSigserv), bearer, timeouts)
 	util.FatalfIf(err == wormhole.ErrBadVersion,
 		"%s%s%s",
 		"the signalling server is running an incompatable version.\n",

@@ -168,19 +168,22 @@ func closeConn(c *websocket.Conn, code websocket.StatusCode, reason string) {
 }
 
 func joinPeers(ctx context.Context, slotKey string, conn *websocket.Conn, initMsg wormhole.InitMsg) (*websocket.Conn, error) {
-	sc, newSlotKey, exists := slots.Setup(slotKey)
-	initMsg.Slot = newSlotKey
-	initMsg.Exists = exists
+	slot, err := slots.Setup(slotKey, false)
+	if err != nil {
+		return nil, err
+	}
+	initMsg.Slot = slot.SlotKey
+	initMsg.Exists = slot.Exists
 	if err := writeConn(ctx, conn, initMsg); err != nil {
 		return nil, err
 	}
 
-	if !exists {
-		if err := waitPair(ctx, conn, sc, slotKey); err != nil {
+	if !slot.Exists {
+		if err := waitPair(ctx, conn, slot.C, slotKey); err != nil {
 			return nil, err
 		}
 
-		return <-sc, nil
+		return <-slot.C, nil
 	}
 
 	// Join an existing slot.
@@ -188,10 +191,10 @@ func joinPeers(ctx context.Context, slotKey string, conn *websocket.Conn, initMs
 	select {
 	case <-ctx.Done():
 		return nil, NewSlotError(slotKey, wormhole.CloseSlotTimedOut, "timed out", nil)
-	case rconn = <-sc: // 收到对端连接
+	case rconn = <-slot.C: // 收到对端连接
 	}
 
-	sc <- conn
+	slot.C <- conn
 	rendezvousCounter.WithLabelValues("success").Inc()
 	return rconn, nil
 }
@@ -223,6 +226,7 @@ func signallingServerCmd(ctx context.Context, sigserv string, args ...string) {
 	httpsAddr := f.String("https", "", "https listen address")
 	debugAddr := f.String("debug", "", "debug and metrics listen address")
 	hosts := f.String("hosts", "", "comma separated list of hosts by which site is accessible")
+	bearer := f.String("bearer", "", "Bearer authentication in header, e.g. Authorization: Bearer xyz")
 	secretPath := f.String("secrets", os.Getenv("HOME")+"/keys", "path to put let's encrypt cache")
 	cert := f.String("cert", "", "https certificate (leave empty to use letsencrypt)")
 	key := f.String("key", "", "https certificate key")
@@ -254,7 +258,18 @@ func signallingServerCmd(ctx context.Context, sigserv string, args ...string) {
 	}
 
 	fs := gziphandler.GzipHandler(http.FileServer(http.FS(gowormhole.Web)))
+
 	handler := func(w http.ResponseWriter, r *http.Request) {
+		if *bearer != "" && "Bearer "+*bearer != r.Header.Get("Authorization") {
+			http.Error(w, "Not Authorized", http.StatusUnauthorized)
+			return
+		}
+
+		if strings.ToLower(r.Header.Get("GoWormhole")) == "reserve_slot_key" {
+			reserveSlotKey(w)
+			return
+		}
+
 		// Handle WebSocket connections.
 		if strings.ToLower(r.Header.Get("Upgrade")) == "websocket" {
 			relay(w, r)
@@ -351,4 +366,23 @@ func signallingServerCmd(ctx context.Context, sigserv string, args ...string) {
 		go func() { errc <- srv.ListenAndServe() }()
 	}
 	log.Fatal(<-errc)
+}
+
+type reserveSlotResult struct {
+	Error string `json:"error"`
+	Key   string `json:"key"`
+}
+
+func reserveSlotKey(w http.ResponseWriter) {
+	item, err := slots.Setup("", true)
+
+	var result reserveSlotResult
+	if err != nil {
+		result.Error = err.Error()
+	} else {
+		result.Key = item.SlotKey
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	json.NewEncoder(w).Encode(result)
+	return
 }

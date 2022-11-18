@@ -115,8 +115,8 @@ func logf(format string, v ...interface{}) {
 	}
 }
 
-func Setup(ctx context.Context, slot, pass, sigserv string, timeouts *Timeouts) (*Wormhole, error) {
-	ir, err := initPeerConnection(ctx, slot, pass, sigserv, timeouts)
+func Setup(ctx context.Context, slot, pass, sigserv, bearer string, timeouts *Timeouts) (*Wormhole, error) {
+	ir, err := initPeerConnection(ctx, slot, pass, sigserv, bearer, timeouts)
 	if err != nil {
 		return nil, err
 	}
@@ -496,8 +496,8 @@ type initPeerConnectionResult struct {
 	Exists   bool
 }
 
-func initPeerConnection(ctx context.Context, slot, pass, sigserv string, timeouts *Timeouts) (*initPeerConnectionResult, error) {
-	ws, err := dialWebsocket(ctx, slot, sigserv)
+func initPeerConnection(ctx context.Context, slot, pass, sigserv, bearer string, timeouts *Timeouts) (*initPeerConnectionResult, error) {
+	ws, err := dialWebsocket(ctx, slot, sigserv, bearer)
 	if err != nil {
 		return nil, err
 	}

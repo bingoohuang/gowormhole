@@ -8,12 +8,18 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
+	"github.com/bingoohuang/gg/pkg/defaults"
 	"github.com/bingoohuang/gg/pkg/iox"
+	"github.com/bingoohuang/gg/pkg/ss"
 	"github.com/bingoohuang/godaemon"
 	"github.com/bingoohuang/golog"
+	"github.com/bingoohuang/gowormhole/internal/util"
+	"github.com/bingoohuang/gowormhole/wordlist"
 	"github.com/bingoohuang/jj"
+	"github.com/go-resty/resty/v2"
 )
 
 func httpCmd(ctx context.Context, sigserv string, args ...string) {
@@ -44,22 +50,32 @@ func httpService(w http.ResponseWriter, r *http.Request) {
 
 	files := jj.Get(body, "files")
 	if files.Type == jj.JSON {
-		resultJSON := sendFiles(body)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Write([]byte(resultJSON))
+		responseJSON(w, sendFiles(body))
 		return
 	}
 
 	dir := jj.Get(body, "dir")
 	if dir.Type == jj.String {
-		resultJSON := recvFiles(body)
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Write([]byte(resultJSON))
+		responseJSON(w, recvFiles(body))
 		return
+	}
+
+	op := jj.Get(body, "operation")
+	if op.Type == jj.String {
+		switch op.String() {
+		case "createCode":
+			responseJSON(w, createCode(body))
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusBadRequest)
 	return
+}
+
+func responseJSON(w http.ResponseWriter, resultJSON string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write([]byte(resultJSON))
 }
 
 func sendFiles(sendFileArgJSON string) (resultJSON string) {
@@ -87,6 +103,53 @@ func sendFiles(sendFileArgJSON string) (resultJSON string) {
 		result.Err = fmt.Errorf("sendFiles %s failed: %v", sendFileArgJSON, err)
 	}
 
+	return
+}
+
+// Create a Resty Client
+var rest = resty.New()
+
+func createCode(argJSON string) (resultJSON string) {
+	var req struct {
+		Bearer       string `json:"bearer"`
+		SecretLength int    `json:"secretLength" default:"2"`
+		Sigserv      string `json:"sigserv"`
+	}
+	var result struct {
+		Code string `json:"code"`
+		Err  error  `json:"error,omitempty"`
+	}
+
+	defer func() {
+		if result.Err != nil {
+			log.Printf("error occured: %+v", result.Err)
+		}
+
+		j, _ := json.Marshal(result)
+		resultJSON = string(j)
+	}()
+
+	if err := json.Unmarshal([]byte(argJSON), &req); err != nil {
+		result.Err = fmt.Errorf("json.Unmarshal %s: %w", argJSON, err)
+		return
+	}
+
+	defaults.Set(&req)
+
+	var reserveResult reserveSlotResult
+	_, err := rest.R().
+		SetHeader("GoWormhole", "reserve_slot_key").
+		SetHeader("Authorization", "bearer "+req.Bearer).
+		SetResult(&reserveResult).
+		Get(ss.Or(req.Sigserv, DefaultSigserv))
+	if err != nil {
+		result.Err = fmt.Errorf("reserve slot failed: %w", err)
+		return
+	}
+
+	pass := string(util.RandPass(req.SecretLength))
+	slotNum, _ := strconv.Atoi(reserveResult.Key)
+	result.Code = wordlist.Encode(slotNum, []byte(pass))
 	return
 }
 
