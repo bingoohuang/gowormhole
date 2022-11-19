@@ -45,8 +45,8 @@ func usage() {
 
 func main() {
 	showVersion := flag.Bool("version", false, "show version and exit")
-	verbose := flag.Bool("verbose", util.LookupEnvOrBool("GW_VERBOSE", true), "verbose logging")
-	sigserv := flag.String("signal", util.LookupEnvOr("GW_SIGSERV", ""), "signalling server to use")
+	verbose := flag.Bool("verbose", util.GetEnvBool("VERBOSE", true), "verbose logging")
+	sigserv := flag.String("signal", os.Getenv("SIGSERV"), "signalling server to use")
 	flag.Usage = usage
 	flag.Parse()
 	if *showVersion {

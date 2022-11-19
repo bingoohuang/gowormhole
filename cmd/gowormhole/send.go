@@ -33,7 +33,7 @@ func sendSubCmd(ctx context.Context, sigserv string, args ...string) {
 	}
 	length := set.Int("length", 2, "length of generated secret")
 	code := set.String("code", "", "use a wormhole code instead of generating one")
-	pBearer := set.String("bearer", "", "Bearer authentication")
+	pBearer := set.String("bearer", os.Getenv("BEARER"), "Bearer authentication")
 
 	_ = set.Parse(args[1:])
 
@@ -101,7 +101,7 @@ func sendFilesByWormhole(c io.ReadWriter, arg *sendFileArg) error {
 	if err != nil {
 		return fmt.Errorf("createSendFilesMeta failed: %w", err)
 	}
-	if _, err := sendJSON(c, meta); err != nil {
+	if err := sendJSON(c, meta); err != nil {
 		return fmt.Errorf("sendJSON SendFilesMeta failed: %w", err)
 	}
 
@@ -113,7 +113,7 @@ func sendFilesByWormhole(c io.ReadWriter, arg *sendFileArg) error {
 	pbBar := util.CreateProgressBar(arg.pb, arg.Progress)
 
 	for _, file := range rsp.Files {
-		log.Printf("sending: %s, hash: %s .... ", file.FullName, file.Hash)
+		log.Printf("sending: %s.... ", codec.Json(file))
 		if err := file.sendFile(c, pbBar); err != nil {
 			return err
 		}
@@ -123,17 +123,22 @@ func sendFilesByWormhole(c io.ReadWriter, arg *sendFileArg) error {
 }
 
 func (file *FileMetaRsp) sendFile(c io.Writer, pb util.ProgressBar) error {
-	var localMeta FileMetaRsp
-	if err := createFileMetaRsp(file.FullName, file.Pos, &localMeta); err != nil {
-		log.Printf("createFileMeta failed: %v", err)
-	}
-	if localMeta.PosHash != file.PosHash {
-		file.Pos = 0 // hash 不一致，重新从头开始传输
+	if file.PosHash != "" {
+		var localMeta FileMetaRsp
+		if err := createFileMetaRsp(file.FullName, file.Pos, &localMeta); err != nil {
+			log.Printf("createFileMeta failed: %v", err)
+		}
+		if localMeta.PosHash != file.PosHash {
+			file.Pos = 0 // hash 不一致，重新从头开始传输
+		}
 	}
 
-	j, err := sendJSON(c, file)
-	if err != nil {
-		return fmt.Errorf("sendJSON %s failed: %w", j, err)
+	if err := sendJSON(c, file); err != nil {
+		return fmt.Errorf("sendJSON failed: %w", err)
+	}
+
+	if file.Pos >= file.Size { // 文件大小为0，或者文件已经传输完毕
+		return nil
 	}
 
 	pb.Start(file.FullName, file.Size)

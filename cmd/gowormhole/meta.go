@@ -46,14 +46,18 @@ type SendFilesMetaRsp struct {
 	Files []*FileMetaRsp `json:"files"`
 }
 
-func createSendFilesMeta(whoami string, files []string) (*SendFilesMeta, error) {
-	hostname, _ := os.Hostname()
+var ips = func() string {
 	_, ips := goip.MainIP()
-	meta := &SendFilesMeta{
-		Whoami:   whoami,
-		Hostname: hostname,
-		Ips:      strings.Join(ips, ","),
-	}
+	return strings.Join(ips, ",")
+}()
+
+var hostname = func() string {
+	h, _ := os.Hostname()
+	return h
+}
+
+func createSendFilesMeta(whoami string, files []string) (*SendFilesMeta, error) {
+	meta := &SendFilesMeta{Whoami: whoami, Hostname: hostname(), Ips: ips}
 	for _, file := range files {
 		fileMeta, err := createFileMetaReq(file)
 		if err != nil {
@@ -216,17 +220,17 @@ func (d *dbManager) Close(dataSourceName string, db *sql.DB) error {
 	return err
 }
 
-func sendJSON(c io.Writer, v interface{}) ([]byte, error) {
+func sendJSON(c io.Writer, v interface{}) error {
 	j, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("json.Marshal failed: %w", err)
+		return fmt.Errorf("json.Marshal failed: %w", err)
 	}
 
 	if _, err := c.Write(j); err != nil {
-		return nil, fmt.Errorf("written failed: %w", err)
+		return fmt.Errorf("written JSON %s failed: %w", j, err)
 	}
 
-	return j, err
+	return err
 }
 
 func recvJSON(c io.Reader, v interface{}) ([]byte, error) {

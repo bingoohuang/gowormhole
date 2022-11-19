@@ -48,6 +48,16 @@ func httpService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if bearer := jj.Get(body, "bearer"); bearer.String() == "" {
+		if envBearer := os.Getenv("BEARER"); envBearer != "" {
+			if newBody, err := jj.Set(body, "bearer", envBearer); err != nil {
+				log.Printf("set bearer to env $BEARER failed: %v", err)
+			} else {
+				body = newBody
+			}
+		}
+	}
+
 	files := jj.Get(body, "files")
 	if files.Type == jj.JSON {
 		responseJSON(w, sendFiles(body))

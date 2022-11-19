@@ -19,7 +19,7 @@ func pipeSubCmd(ctx context.Context, sigserv string, args ...string) {
 		set.PrintDefaults()
 	}
 	length := set.Int("length", 2, "length of generated secret, if generating")
-	pBearer := set.String("bearer", "", "Bearer authentication")
+	pBearer := set.String("bearer", os.Getenv("BEARER"), "Bearer authentication")
 
 	_ = set.Parse(args[1:])
 

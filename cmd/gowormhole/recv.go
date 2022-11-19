@@ -110,7 +110,7 @@ func receiveByWormhole(ctx context.Context, c io.ReadWriter, arg *receiveFileArg
 		rspFiles = append(rspFiles, rsp)
 	}
 
-	if _, err := sendJSON(c, SendFilesMetaRsp{
+	if err := sendJSON(c, SendFilesMetaRsp{
 		Files: rspFiles,
 	}); err != nil {
 		return fmt.Errorf("sendJSON SendFilesMetaResponse failed: %w", err)
@@ -128,15 +128,12 @@ func receiveByWormhole(ctx context.Context, c io.ReadWriter, arg *receiveFileArg
 			log.Printf("receive file %s", fileJSON)
 		}
 
-		log.Printf("receiving: %s... ", file.RecvFullName)
-
 		if err := file.receiving(ctx, c, db, pb); err != nil {
 			return err
 		}
 
-		metaFile, _ := createFileMetaReq(file.RecvFullName)
-		if metaFile != nil {
-			log.Printf("receiving: %s hash: %s ", file.RecvFullName, metaFile.Hash)
+		if metaFile, _ := createFileMetaReq(file.RecvFullName); metaFile != nil {
+			log.Printf("check received file: %s hash: %s ", file.RecvFullName, metaFile.Hash)
 		}
 	}
 }
@@ -151,7 +148,7 @@ func parseFlags(args []string) (dir, code, bearer string, passLength int) {
 	}
 	length := set.Int("length", 2, "length of generated secret, if generating")
 	directory := set.String("dir", ".", "directory to put downloaded files")
-	pBearer := set.String("bearer", "", "Bearer authentication")
+	pBearer := set.String("bearer", os.Getenv("BEARER"), "Bearer authentication")
 	_ = set.Parse(args[1:])
 
 	if set.NArg() > 1 {
@@ -167,13 +164,6 @@ func parseFlags(args []string) (dir, code, bearer string, passLength int) {
 }
 
 func (file *FileMetaRsp) receiving(ctx context.Context, c io.Reader, db *sql.DB, pb util.ProgressBar) error {
-	if file.Pos == file.Size {
-		pb.Start(file.RecvFullName, file.Size)
-		pb.Add(file.Pos)
-		pb.Finish()
-		return nil
-	}
-
 	f, err := os.OpenFile(file.RecvFullName, os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("create output file %s failed: %w", codec.Json(file), err)
@@ -181,14 +171,20 @@ func (file *FileMetaRsp) receiving(ctx context.Context, c io.Reader, db *sql.DB,
 
 	defer iox.Close(f)
 
+	pb.Start(file.RecvFullName, file.Size)
+	pb.Add(file.Pos)
+
+	if file.Pos >= file.Size {
+		pb.Finish()
+		return nil
+	}
+
 	if file.Pos > 0 {
 		if _, err := f.Seek(int64(file.Pos), io.SeekStart); err != nil {
 			return fmt.Errorf("seek %s  failed: %w", codec.Json(file), err)
 		}
 	}
 
-	pb.Start(file.RecvFullName, file.Size)
-	pb.Add(file.Pos)
 	p := newSaveN(ctx, db, file.Hash, file.Pos, pb)
 	defer p.Finish()
 

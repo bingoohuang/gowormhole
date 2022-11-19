@@ -57,7 +57,7 @@ func PrintQRCode(baseURL, code string) {
 	log.Printf("%s\n", u.String())
 }
 
-func LookupEnvOrBool(key string, defaultVal bool) bool {
+func GetEnvBool(key string, defaultVal bool) bool {
 	if v, ok := os.LookupEnv(key); ok {
 		val, err := strconv.ParseBool(v)
 		FatalfIf(err != nil, "Cannot parse envvar: %s: %v", v, err)
@@ -67,7 +67,7 @@ func LookupEnvOrBool(key string, defaultVal bool) bool {
 	return defaultVal
 }
 
-func LookupEnvOr(key string, defaultVal string) string {
+func GetEnv(key string, defaultVal string) string {
 	if val, ok := os.LookupEnv(key); ok {
 		return val
 	}
