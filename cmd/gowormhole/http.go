@@ -13,6 +13,7 @@ import (
 
 	"github.com/bingoohuang/gg/pkg/defaults"
 	"github.com/bingoohuang/gg/pkg/iox"
+	"github.com/bingoohuang/gg/pkg/netx/freeport"
 	"github.com/bingoohuang/gg/pkg/ss"
 	"github.com/bingoohuang/godaemon"
 	"github.com/bingoohuang/golog"
@@ -30,7 +31,7 @@ func httpCmd(ctx context.Context, sigserv string, args ...string) {
 		_, _ = fmt.Fprintf(f.Output(), "flags:\n")
 		f.PrintDefaults()
 	}
-	httpAddr := f.String("addr", ":31415", "http listen address")
+	httpAddr := f.String("addr", "", "http listen address, default :31415")
 	pDaemon := f.Bool("daemon", false, "Daemonized")
 	_ = f.Parse(args[1:])
 
@@ -38,7 +39,18 @@ func httpCmd(ctx context.Context, sigserv string, args ...string) {
 	golog.Setup()
 
 	http.HandleFunc("/", httpService)
-	http.ListenAndServe(*httpAddr, nil)
+	addr := *httpAddr
+	if addr == "" {
+		addr = fmt.Sprintf(":%d", freeport.PortStart(31415))
+	}
+
+	log.Printf("Listening on %s", addr)
+
+	if err := http.ListenAndServe(addr, nil); err != nil {
+		log.Printf("listen error: %v", err)
+	}
+
+	log.Printf("exiting...")
 }
 
 func httpService(w http.ResponseWriter, r *http.Request) {
@@ -187,6 +199,7 @@ func recvFiles(argJSON string) (resultJSON string) {
 	result.interval = arg.ResultInterval
 	result.arg = &arg
 	arg.pb = result
+	arg.recvMeta = result
 
 	if err := receiveRetry(context.TODO(), &arg); err != nil {
 		result.Err = fmt.Errorf("receive: %w", err)
@@ -239,6 +252,11 @@ type FilesResult struct {
 	interval  time.Duration
 	jsonFile  string
 	arg       CodeAware
+	*SendFilesMeta
+}
+
+func (c *FilesResult) SetSendFilesMeta(meta *SendFilesMeta) {
+	c.SendFilesMeta = meta
 }
 
 type FileProgress struct {

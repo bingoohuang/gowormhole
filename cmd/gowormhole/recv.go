@@ -46,6 +46,12 @@ type BaseArg struct {
 	ResultInterval time.Duration     `json:"resultInterval" default:"1s"`
 
 	pb util.ProgressBar
+
+	recvMeta SendFilesMetaSetter
+}
+
+type SendFilesMetaSetter interface {
+	SetSendFilesMeta(*SendFilesMeta)
 }
 
 type receiveFileArg struct {
@@ -95,6 +101,10 @@ func receiveByWormhole(ctx context.Context, c io.ReadWriter, arg *receiveFileArg
 		return fmt.Errorf("recvJSON SendFilesMeta failed: %w", err)
 	} else {
 		log.Printf("receiveByWormhole %s", metaJSON)
+	}
+
+	if arg.recvMeta != nil {
+		arg.recvMeta.SetSendFilesMeta(&meta)
 	}
 
 	db := dbm.GetDB(ctx, arg.DriverName, arg.DataSourceName)
