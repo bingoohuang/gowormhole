@@ -121,6 +121,7 @@ func sendFiles(sendFileArgJSON string) (resultJSON string) {
 	result.interval = arg.ResultInterval
 	result.arg = &arg
 	arg.pb = result
+	arg.recvMeta = result
 
 	if err := sendFilesRetry(&arg); err != nil {
 		result.Err = fmt.Errorf("sendFiles %s failed: %v", sendFileArgJSON, err)

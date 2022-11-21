@@ -55,7 +55,14 @@ func GetVersion(outParam **C.char, outLen *C.int) int {
 // resultInterval:  可选。刷新进度间隔，默认1s.
 //
 // 输出 JSON 文件内容示例：
-// {"code": "", "error":"", "progresses":[{"filename":"a.jpg", "size": 12345, "written": 1024, "finished": false}]}
+// result: {"code":"elves-area-hug","error":null,"progresses":[{"filename":"061.png","size":491520,"written":491520,"finished":true},
+// {"filename":"065.png","size":20755401,"written":20755401,"finished":true}],
+// "whoami":"","hostname":"bingoobjcadeMacBook-Pro.local","ips":"192.168.1.124",
+// "files":[{"cleanName":"061.png","fullName":"061.png","size":491520,"hash":"14520279925969270108"},
+//
+//	{"cleanName":"065.png","fullName":"065.png","size":20755401,"hash":"461518138232695385"}]
+//	}
+//
 // code: 传输短码
 // error: 错误信息
 // filename: 文件名
@@ -91,7 +98,14 @@ func SendFiles(argJSON *C.char, outParam **C.char, outLen *C.int) int {
 // resultInterval:  可选。 刷新进度间隔，默认1s.
 //
 // 输出 JSON 文件内容示例：
-// {"code": "", "error":"", "progresses":[{"filename":"a.jpg", "size": 12345, "written": 1024, "finished": false}]}
+// result: {"code":"elves-area-hug","error":null,"progresses":[{"filename":"061.png","size":491520,"written":491520,"finished":true},
+// {"filename":"065.png","size":20755401,"written":20755401,"finished":true}],
+// "whoami":"","hostname":"bingoobjcadeMacBook-Pro.local","ips":"192.168.1.124",
+// "files":[{"cleanName":"061.png","fullName":"061.png","size":491520,"hash":"14520279925969270108"},
+//
+//	{"cleanName":"065.png","fullName":"065.png","size":20755401,"hash":"461518138232695385"}]
+//	}
+//
 // code: 传输短码
 // error: 错误信息
 // filename: 文件名

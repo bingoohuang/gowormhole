@@ -105,6 +105,10 @@ func sendFilesByWormhole(c io.ReadWriter, arg *sendFileArg) error {
 		return fmt.Errorf("sendJSON SendFilesMeta failed: %w", err)
 	}
 
+	if arg.recvMeta != nil {
+		arg.recvMeta.SetSendFilesMeta(meta)
+	}
+
 	var rsp SendFilesMetaRsp
 	if _, err := recvJSON(c, &rsp); err != nil {
 		return fmt.Errorf("recvJSON failed: %w", err)
