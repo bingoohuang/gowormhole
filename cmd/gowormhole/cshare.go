@@ -51,7 +51,10 @@ func GetVersion(outParam **C.char, outLen *C.int) int {
 //
 // retryTimes:  可选。重试次数，默认 10
 // whoami:  可选。我是谁，标记当前客户端信息
-// resultFile:  可选。输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后使用独立线程定时从此文件中读取进度结果
+// resultFile:  可选。输出结果,默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后独立线程定时从此文件中读取进度结果
+//  1. 输出的 JSON 文件名，例如：p2p_result.json
+//  2. 输出的 POST URL， 例如： http://127.0.0.1:5003/p2p
+//
 // resultInterval:  可选。刷新进度间隔，默认1s.
 //
 // 输出 JSON 文件内容示例：
@@ -94,7 +97,10 @@ func SendFiles(argJSON *C.char, outParam **C.char, outLen *C.int) int {
 //   - rwTimeout is maximum read/write time to send file by WebWormhole
 //
 // retryTimes:  可选。重试次数，默认 10
-// resultFile:  可选。输出结果 JSON 文件名，默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后独立线程定时从此文件中读取进度结果
+// resultFile:  可选。输出结果,默认不输出，需要访问传输进度，请设置此文件，例如: some.json，然后独立线程定时从此文件中读取进度结果
+//  1. 输出的 JSON 文件名，例如：p2p_result.json
+//  2. 输出的 POST URL， 例如： http://127.0.0.1:5003/p2p
+//
 // resultInterval:  可选。 刷新进度间隔，默认1s.
 //
 // 输出 JSON 文件内容示例：

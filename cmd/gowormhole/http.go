@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -133,6 +134,10 @@ func sendFiles(sendFileArgJSON string) (resultJSON string) {
 // Create a Resty Client
 var rest = resty.New()
 
+func init() {
+	rest.SetTimeout(10 * time.Second)
+}
+
 func createCode(argJSON string) (resultJSON string) {
 	var req struct {
 		Bearer       string `json:"bearer"`
@@ -220,16 +225,6 @@ func (c *FilesResult) Start(filename string, n uint64) {
 	c.writeJSON()
 }
 
-func (c *FilesResult) writeJSON() {
-	if c.jsonFile != "" {
-		c.startTime = time.Now()
-		j, _ := json.Marshal(c)
-		if err := os.WriteFile(c.jsonFile, j, os.ModePerm); err != nil {
-			log.Printf("write result json error: %v", err)
-		}
-	}
-}
-
 func (c *FilesResult) Add(n uint64) {
 	c.currentProgress.Written += n
 	if time.Since(c.startTime) >= c.interval {
@@ -241,6 +236,31 @@ func (c *FilesResult) Finish() {
 	c.currentProgress.Finished = true
 	c.currentProgress = nil
 	c.writeJSON()
+}
+
+func (c *FilesResult) writeJSON() {
+	if c.jsonFile == "" {
+		return
+	}
+
+	c.startTime = time.Now()
+	j, _ := json.Marshal(c)
+
+	if u, err := url.Parse(c.jsonFile); err == nil {
+		if rsp, err := rest.R().
+			SetHeader("Content-Type", "application/json; charset=utf-8").
+			SetBody(j).
+			Post(u.String()); err != nil {
+			log.Printf("call url %s failed: %v", c.jsonFile, err)
+		} else if rsp != nil {
+			log.Printf("call url %s result: %v", c.jsonFile, rsp.String())
+		}
+		return
+	}
+
+	if err := os.WriteFile(c.jsonFile, j, os.ModePerm); err != nil {
+		log.Printf("write result json error: %v", err)
+	}
 }
 
 type FilesResult struct {
