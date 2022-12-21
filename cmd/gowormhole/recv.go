@@ -83,7 +83,11 @@ func receiveRetry(ctx context.Context, arg *receiveFileArg) error {
 }
 
 func receiveOnce(ctx context.Context, arg *receiveFileArg) error {
-	c := newConn(context.TODO(), arg.Sigserv, arg.Bearer, arg.Code, arg.SecretLength, &arg.Timeouts)
+	c, err := newConn(context.TODO(), arg.Sigserv, arg.Bearer, arg.Code, arg.SecretLength, &arg.Timeouts)
+	if err != nil {
+		return err
+	}
+
 	arg.Code = c.Code
 	defer iox.Close(c)
 

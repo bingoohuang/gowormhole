@@ -68,26 +68,24 @@ func main() {
 	cmd(context.TODO(), *sigserv, flag.Args()...)
 }
 
-func newConn(ctx context.Context, sigserv, bearer string, code string, length int, timeouts *wormhole.Timeouts) *wormhole.Wormhole {
+func newConn(ctx context.Context, sigserv, bearer, code string, length int, timeouts *wormhole.Timeouts) (*wormhole.Wormhole, error) {
 	slotKey, pass := "", ""
 	if code == "" {
 		pass = string(util.RandPass(length))
 	} else {
 		slot, pass1 := wordlist.Decode(code)
-		util.FatalfIf(pass1 == nil, "could not decode password")
+		if pass1 == nil {
+			return nil, fmt.Errorf("bad code, could not decode password")
+		}
 		slotKey = strconv.Itoa(slot)
 		pass = string(pass1)
 	}
 
 	c, err := wormhole.Setup(ctx, slotKey, pass, ss.Or(sigserv, DefaultSigserv), bearer, timeouts)
-	util.FatalfIf(err == wormhole.ErrBadVersion,
-		"%s%s%s",
-		"the signalling server is running an incompatable version.\n",
-		"try upgrading the client:\n\n",
-		"    go get github.com/bingoohuang/gowormhole/cmd/gowormhole\n",
-	)
+	if err != nil {
+		return nil, fmt.Errorf("could not dial: %w", err)
+	}
 
-	util.FatalfIf(err != nil, "could not dial: %v", err)
 	log.Printf("connected: %s", util.If(c.IsRelay(), "relay", "direct"))
-	return c
+	return c, nil
 }
