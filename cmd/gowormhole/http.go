@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"time"
@@ -246,11 +245,11 @@ func (c *FilesResult) writeJSON() {
 	c.startTime = time.Now()
 	j, _ := json.Marshal(c)
 
-	if u, err := url.Parse(c.jsonFile); err == nil {
+	if ss.HasPrefix(c.jsonFile, "http://", "https://") {
 		if rsp, err := rest.R().
 			SetHeader("Content-Type", "application/json; charset=utf-8").
 			SetBody(j).
-			Post(u.String()); err != nil {
+			Post(c.jsonFile); err != nil {
 			log.Printf("call url %s failed: %v", c.jsonFile, err)
 		} else if rsp != nil {
 			log.Printf("call url %s result: %v", c.jsonFile, rsp.String())

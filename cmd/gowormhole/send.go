@@ -118,11 +118,11 @@ func sendFilesByWormhole(c io.ReadWriter, arg *sendFileArg) error {
 		return fmt.Errorf("recvJSON failed: %w", err)
 	}
 
-	pbBar := util.CreateProgressBar(arg.pb, arg.Progress)
+	pb := util.CreateProgressBar(arg.pb, arg.Progress)
 
 	for _, file := range rsp.Files {
 		log.Printf("sending: %s.... ", codec.Json(file))
-		if err := file.sendFile(c, pbBar); err != nil {
+		if err := file.sendFile(c, pb); err != nil {
 			return err
 		}
 	}

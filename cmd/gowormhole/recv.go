@@ -178,9 +178,9 @@ func (file *FileMetaRsp) receiving(ctx context.Context, c io.Reader, pb util.Pro
 
 	pb.Start(file.RecvFullName, file.Size)
 	pb.Add(file.Pos)
+	defer pb.Finish()
 
 	if file.Pos >= file.Size {
-		pb.Finish()
 		return nil
 	}
 
@@ -190,11 +190,8 @@ func (file *FileMetaRsp) receiving(ctx context.Context, c io.Reader, pb util.Pro
 		}
 	}
 
-	p := newSaveN(ctx, file.Hash, file.Pos, pb)
-	defer p.Finish()
-
 	remainSize := int64(file.Size - file.Pos)
-	written, err := io.CopyN(f, util.NewProxyReader(c, p), remainSize)
+	written, err := io.CopyN(f, util.NewProxyReader(c, pb), remainSize)
 	if err != nil {
 		return fmt.Errorf("create receive file %+v failed: %w", *file, err)
 	}
