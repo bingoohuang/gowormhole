@@ -1,8 +1,6 @@
 package main
 
 import (
-	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,14 +9,11 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/OneOfOne/xxhash"
-	"github.com/bingoohuang/gg/pkg/codec"
 	"github.com/bingoohuang/gg/pkg/goip"
 	"github.com/bingoohuang/gg/pkg/iox"
-	"github.com/bingoohuang/gg/pkg/sqx"
 )
 
 type FileMetaRsp struct {
@@ -139,87 +134,6 @@ type Recv struct {
 	Cost     string
 }
 
-func updateRecvTable(ctx context.Context, db *sql.DB, hash string, pos uint64, cost string) error {
-	r, err := db.ExecContext(ctx, updateTableRecvSQL, pos, time.Now(), cost, hash)
-	if err != nil {
-		return fmt.Errorf("update table failed: %w", err)
-	}
-
-	if rowsAffected, _ := r.RowsAffected(); rowsAffected != 1 {
-		return fmt.Errorf("update table failed because rowsAffected = 0")
-	}
-
-	return nil
-}
-
-func (file *FileMetaReq) LookupDB(ctx context.Context, db *sql.DB, dir string, meta SendFilesMeta) (*Recv, error) {
-	var recv Recv
-	sq := sqx.SQL{Q: hashQuerySQL, Ctx: ctx, Vars: sqx.Vars(file.Hash), NoLog: true}
-	if err := sq.Query(db, &recv); err == nil {
-		log.Printf("lookup db %s", codec.Json(recv))
-		return &recv, nil
-	}
-
-	r := Recv{
-		Hash:     file.Hash,
-		Size:     file.Size,
-		Pos:      0,
-		Expired:  time.Now().Add(24 * time.Hour),
-		Updated:  time.Now(),
-		Name:     file.CleanName,
-		Full:     path.Join(dir, file.CleanName),
-		Hostname: meta.Hostname,
-		Ips:      meta.Ips,
-		Whoami:   meta.Whoami,
-	}
-	if _, err := db.ExecContext(ctx, insertTableRecvSQL,
-		r.Hash, r.Size, r.Pos, r.Expired, r.Updated, r.Name, r.Full, r.Hostname, r.Ips, r.Whoami); err != nil {
-		return nil, fmt.Errorf("insert recv failed: %w", err)
-	}
-	return &r, nil
-}
-
-type dbManager struct {
-	dbs map[string]*sql.DB
-	sync.RWMutex
-}
-
-var dbm = &dbManager{dbs: make(map[string]*sql.DB)}
-
-func (d *dbManager) GetDB(ctx context.Context, driverName, dataSourceName string) *sql.DB {
-	d.RLock()
-	db, ok := d.dbs[dataSourceName]
-	d.RUnlock()
-	if ok {
-		return db
-	}
-
-	d.Lock()
-	defer d.Unlock()
-
-	db, err := sql.Open(driverName, dataSourceName)
-	if err != nil {
-		log.Fatalf("open db (driverName: %s, dataSourceName: %s) failed: %v", driverName, dataSourceName, err)
-	}
-
-	if _, err := db.ExecContext(ctx, createTableRecvSQL); err != nil {
-		log.Printf("createTableRecvSQL failed: %v", err)
-	}
-
-	d.dbs[dataSourceName] = db
-	return db
-}
-
-func (d *dbManager) Close(dataSourceName string, db *sql.DB) error {
-	d.Lock()
-	defer d.Unlock()
-
-	err := db.Close()
-	delete(d.dbs, dataSourceName)
-
-	return err
-}
-
 func sendJSON(c io.Writer, v interface{}) error {
 	j, err := json.Marshal(v)
 	if err != nil {
@@ -252,24 +166,14 @@ func recvJSON(c io.Reader, v interface{}) ([]byte, error) {
 	return buf[:n], nil
 }
 
-func (file *FileMetaReq) LookupFilePos(ctx context.Context, db *sql.DB, dir string, meta SendFilesMeta) (*FileMetaRsp, error) {
-	recv, err := file.LookupDB(ctx, db, dir, meta)
-	if err != nil {
-		return nil, fmt.Errorf("lookup failed: %w", err)
-	}
-
+func (file *FileMetaReq) LookupFilePos(dir string) (*FileMetaRsp, error) {
 	rsp := &FileMetaRsp{
 		FileMetaReq: *file,
 	}
 
-	if err := createFileMetaRsp(recv.Full, 0, rsp); err != nil {
+	full := path.Join(dir, file.CleanName)
+	if err := createFileMetaRsp(full, 0, rsp); err != nil {
 		log.Printf("createFileMeta failed: %v", err)
-	}
-
-	if rsp.Pos != recv.Pos {
-		if err := updateRecvTable(ctx, db, recv.Hash, rsp.Pos, recv.Cost); err != nil {
-			log.Printf("update recv pos failed: %v", err)
-		}
 	}
 
 	return rsp, nil

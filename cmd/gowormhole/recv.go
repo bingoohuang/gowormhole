@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"flag"
 	"fmt"
 	"io"
@@ -57,11 +56,6 @@ type SendFilesMetaSetter interface {
 type receiveFileArg struct {
 	BaseArg `default:"{}"`
 	Dir     string `json:"dir" default:"."`
-
-	DriverName     string `json:"driverName" default:"sqlite"`
-	DataSourceName string `json:"dataSourceName" default:"gowormhole.db"`
-
-	db *sql.DB
 }
 
 func receiveRetry(ctx context.Context, arg *receiveFileArg) error {
@@ -83,7 +77,7 @@ func receiveRetry(ctx context.Context, arg *receiveFileArg) error {
 }
 
 func receiveOnce(ctx context.Context, arg *receiveFileArg) error {
-	c, err := newConn(context.TODO(), arg.Sigserv, arg.Bearer, arg.Code, arg.SecretLength, &arg.Timeouts)
+	c, err := newConn(ctx, arg.Sigserv, arg.Bearer, arg.Code, arg.SecretLength, &arg.Timeouts)
 	if err != nil {
 		return err
 	}
@@ -111,12 +105,9 @@ func receiveByWormhole(ctx context.Context, c io.ReadWriter, arg *receiveFileArg
 		arg.recvMeta.SetSendFilesMeta(&meta)
 	}
 
-	db := dbm.GetDB(ctx, arg.DriverName, arg.DataSourceName)
-	defer dbm.Close(arg.DataSourceName, db)
-
 	var rspFiles []*FileMetaRsp
 	for _, f := range meta.Files {
-		rsp, err := f.LookupFilePos(ctx, db, arg.Dir, meta)
+		rsp, err := f.LookupFilePos(arg.Dir)
 		if err != nil {
 			return fmt.Errorf("receiveByWormhole failed: %w", err)
 		}
@@ -142,7 +133,7 @@ func receiveByWormhole(ctx context.Context, c io.ReadWriter, arg *receiveFileArg
 			log.Printf("receive file %s", fileJSON)
 		}
 
-		if err := file.receiving(ctx, c, db, pb); err != nil {
+		if err := file.receiving(ctx, c, pb); err != nil {
 			return err
 		}
 
@@ -177,7 +168,7 @@ func parseFlags(args []string) (dir, code, bearer string, passLength int) {
 	return
 }
 
-func (file *FileMetaRsp) receiving(ctx context.Context, c io.Reader, db *sql.DB, pb util.ProgressBar) error {
+func (file *FileMetaRsp) receiving(ctx context.Context, c io.Reader, pb util.ProgressBar) error {
 	f, err := os.OpenFile(file.RecvFullName, os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("create output file %s failed: %w", codec.Json(file), err)
@@ -199,7 +190,7 @@ func (file *FileMetaRsp) receiving(ctx context.Context, c io.Reader, db *sql.DB,
 		}
 	}
 
-	p := newSaveN(ctx, db, file.Hash, file.Pos, pb)
+	p := newSaveN(ctx, file.Hash, file.Pos, pb)
 	defer p.Finish()
 
 	remainSize := int64(file.Size - file.Pos)
