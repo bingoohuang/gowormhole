@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -72,13 +73,13 @@ type sendFileArg struct {
 
 func sendFilesRetry(arg *sendFileArg) error {
 	if err := defaults.Set(arg); err != nil {
-		log.Printf("defaults.Set: %v", err)
+		return fmt.Errorf("defaults.Set failed: %w", err)
 	}
 
 	var err error
 	for i := 1; i <= arg.RetryTimes; i++ {
-		if err = sendFilesOnce(arg); err == nil {
-			return nil
+		if err = sendFilesOnce(arg); err == nil || errors.Is(err, ErrRetryUnsupported) {
+			return err
 		}
 
 		log.Printf("send file failed: %v , retryTimes: %d", err, i)

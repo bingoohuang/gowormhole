@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -68,6 +69,8 @@ func main() {
 	cmd(context.TODO(), *sigserv, flag.Args()...)
 }
 
+var ErrRetryUnsupported = errors.New("retry Unsupported")
+
 func newConn(ctx context.Context, sigserv, bearer, code string, length int, timeouts *wormhole.Timeouts) (*wormhole.Wormhole, error) {
 	slotKey, pass := "", ""
 	if code == "" {
@@ -75,7 +78,7 @@ func newConn(ctx context.Context, sigserv, bearer, code string, length int, time
 	} else {
 		slot, pass1 := wordlist.Decode(code)
 		if pass1 == nil {
-			return nil, fmt.Errorf("bad code, could not decode password")
+			return nil, fmt.Errorf("bad code, could not decode password: %w", ErrRetryUnsupported)
 		}
 		slotKey = strconv.Itoa(slot)
 		pass = string(pass1)

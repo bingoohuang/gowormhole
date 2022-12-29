@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -60,14 +61,14 @@ type receiveFileArg struct {
 
 func receiveRetry(ctx context.Context, arg *receiveFileArg) error {
 	if err := defaults.Set(arg); err != nil {
-		log.Printf("defaults.Set %+v failed: %v", arg, err)
+		return fmt.Errorf("defaults.Set failed: %w", err)
 	}
 
 	var err error
 
 	for i := 1; i <= arg.RetryTimes; i++ {
-		if err = receiveOnce(ctx, arg); err == nil {
-			return nil
+		if err = receiveOnce(ctx, arg); err == nil || errors.Is(err, ErrRetryUnsupported) {
+			return err
 		}
 
 		log.Printf("receive failed: %v, retryTimes: %d", err, i)

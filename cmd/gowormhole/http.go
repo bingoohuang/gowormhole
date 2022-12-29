@@ -38,7 +38,11 @@ func httpCmd(ctx context.Context, sigserv string, args ...string) {
 	godaemon.Daemonize(*pDaemon)
 	golog.Setup()
 
-	http.HandleFunc("/", httpService)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if err := httpService(w, r); err != nil {
+			log.Printf("error: %v", err)
+		}
+	})
 	addr := *httpAddr
 	if addr == "" {
 		addr = fmt.Sprintf(":%d", freeport.PortStart(31415))
@@ -53,11 +57,11 @@ func httpCmd(ctx context.Context, sigserv string, args ...string) {
 	log.Printf("exiting...")
 }
 
-func httpService(w http.ResponseWriter, r *http.Request) {
+func httpService(w http.ResponseWriter, r *http.Request) error {
 	body := iox.ReadString(r.Body)
 	if !jj.Valid(body) {
 		w.WriteHeader(http.StatusBadRequest)
-		return
+		return nil
 	}
 
 	if bearer := jj.Get(body, "bearer"); bearer.String() == "" {
@@ -70,34 +74,29 @@ func httpService(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	files := jj.Get(body, "files")
-	if files.Type == jj.JSON {
-		responseJSON(w, sendFiles(body))
-		return
+	if files := jj.Get(body, "files"); files.Type == jj.JSON {
+		return responseJSON(w, sendFiles(body))
 	}
 
-	dir := jj.Get(body, "dir")
-	if dir.Type == jj.String {
-		responseJSON(w, recvFiles(body))
-		return
+	if dir := jj.Get(body, "dir"); dir.Type == jj.String {
+		return responseJSON(w, recvFiles(body))
 	}
 
-	op := jj.Get(body, "operation")
-	if op.Type == jj.String {
+	if op := jj.Get(body, "operation"); op.Type == jj.String {
 		switch op.String() {
 		case "createCode":
-			responseJSON(w, createCode(body))
-			return
+			return responseJSON(w, createCode(body))
 		}
 	}
 
 	w.WriteHeader(http.StatusBadRequest)
-	return
+	return nil
 }
 
-func responseJSON(w http.ResponseWriter, resultJSON string) {
+func responseJSON(w http.ResponseWriter, resultJSON string) error {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write([]byte(resultJSON))
+	_, err := w.Write([]byte(resultJSON))
+	return err
 }
 
 func sendFiles(sendFileArgJSON string) (resultJSON string) {
@@ -105,6 +104,7 @@ func sendFiles(sendFileArgJSON string) (resultJSON string) {
 	defer func() {
 		if result.Err != nil {
 			log.Printf("error occured: %+v", result.Err)
+			result.ErrString = result.Err.Error()
 		}
 		j, _ := json.Marshal(result)
 		log.Printf("sendFiles result: %s", j)
@@ -122,11 +122,7 @@ func sendFiles(sendFileArgJSON string) (resultJSON string) {
 	result.arg = &arg
 	arg.pb = result
 	arg.recvMeta = result
-
-	if err := sendFilesRetry(&arg); err != nil {
-		result.Err = fmt.Errorf("sendFiles %s failed: %v", sendFileArgJSON, err)
-	}
-
+	result.Err = sendFilesRetry(&arg)
 	return
 }
 
@@ -187,6 +183,7 @@ func recvFiles(argJSON string) (resultJSON string) {
 	defer func() {
 		if result.Err != nil {
 			log.Printf("error occured: %+v", result.Err)
+			result.ErrString = result.Err.Error()
 		}
 
 		j, _ := json.Marshal(result)
@@ -263,9 +260,10 @@ func (c *FilesResult) writeJSON() {
 }
 
 type FilesResult struct {
-	Code            string          `json:"code"`
-	Err             error           `json:"error"`
-	Progresses      []*FileProgress `json:"progresses"`
+	Code            string          `json:"code,omitempty"`
+	Err             error           `json:"-"`
+	ErrString       string          `json:"error,omitempty"`
+	Progresses      []*FileProgress `json:"progresses,omitempty"`
 	currentProgress *FileProgress
 
 	startTime time.Time
