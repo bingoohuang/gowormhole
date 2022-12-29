@@ -26,19 +26,9 @@ js:
 	tsc -T ES2018 --strict web/ww.ts
 	tsc -T ES2018 --strict web/sw.ts
 
-UNAME := $(shell uname)
-
-ifeq ($(UNAME), Darwin)
-    DYLIB_EXT := .dylib
-    FLAGS := -ldflags -s
-else
-    DYLIB_EXT := .so
-    FLAGS := ''
-endif
-
 so:
 	# New in Go 1.5, build Go dynamic lib
-	go build $(FLAGS) -o gowormhole$(DYLIB_EXT) -buildmode=c-shared ./cmd/gowormhole
+	go build -ldflags -s -o gowormhole.so -buildmode=c-shared ./cmd/gowormhole
 
 # windows 需要先安装 gcc，[tdm-gcc 安装](https://jmeubank.github.io/tdm-gcc/)
 dll:
