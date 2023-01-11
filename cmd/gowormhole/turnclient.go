@@ -16,7 +16,7 @@ import (
 )
 
 // https://github.com/pion/turn/blob/master/examples/turn-client/udp/main.go
-func turnClientSubCmd(ctx context.Context, sigserv string, args ...string) {
+func turnClientSubCmd(ctx context.Context, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "run the gowormhole TURN client\n\n")

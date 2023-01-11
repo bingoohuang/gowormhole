@@ -42,7 +42,6 @@ import (
 	"time"
 
 	"github.com/bingoohuang/gg/pkg/defaults"
-	"github.com/bingoohuang/gg/pkg/ss"
 	"github.com/bingoohuang/gowormhole/internal/util"
 	"github.com/bingoohuang/gowormhole/wordlist"
 	"github.com/pion/webrtc/v3"
@@ -120,10 +119,10 @@ func Setup(ctx context.Context, slot, pass, sigserv, bearer string, timeouts *Ti
 	if err != nil {
 		return nil, err
 	}
-	if ir.Exists {
-		err = joinWormhole(ctx, ir, pass)
-	} else {
+	if ir.Mode == ModePeer1 {
 		err = newWormhole(ctx, ir, pass)
+	} else {
+		err = joinWormhole(ctx, ir, pass)
 	}
 
 	if err != nil {
@@ -219,8 +218,29 @@ func (c *Wormhole) error(err error) {
 	c.err <- err
 }
 
+type SlotItemMode int
+
+const (
+	ModeNone  SlotItemMode = iota // 当前 Slot 为保留（预先生成 code 专用)
+	ModePeer1                     // 当前 Slot 已经有一方与信令服务器建立 WebSocket 连接
+	ModePeer2                     // 当前 Slot 已经有两方与信令服务器建立 WebSocket 连接
+)
+
+func (mode SlotItemMode) String() string {
+	switch mode {
+	case ModeNone:
+		return "ModeNone"
+	case ModePeer1:
+		return "ModePeer1"
+	case ModePeer2:
+		return "ModePeer2"
+	}
+
+	return "unknown"
+}
+
 type InitMsg struct {
-	Exists     bool               `json:"exists,omitempty"`
+	Mode       SlotItemMode       `json:"exists,omitempty"`
 	Slot       string             `json:"slot,omitempty"`
 	ICEServers []webrtc.ICEServer `json:"iceServers,omitempty"`
 }
@@ -493,7 +513,7 @@ func waitDataChannelOpen(ctx context.Context, c *Wormhole, ws *websocket.Conn, k
 type initPeerConnectionResult struct {
 	Ws       *websocket.Conn
 	Wormhole *Wormhole
-	Exists   bool
+	Mode     SlotItemMode
 }
 
 func initPeerConnection(ctx context.Context, slot, pass, sigserv, bearer string, timeouts *Timeouts) (*initPeerConnectionResult, error) {
@@ -512,7 +532,7 @@ func initPeerConnection(ctx context.Context, slot, pass, sigserv, bearer string,
 		return nil, fmt.Errorf("read InitMsg failed: %w", err)
 	}
 
-	logf("connected to signalling server, got %s slot: %v", ss.If(initMsg.Exists, "old", "new"), initMsg.Slot)
+	logf("connected to signalling server, got %s slot: %v", initMsg.Mode, initMsg.Slot)
 
 	slotNum, err := strconv.Atoi(initMsg.Slot)
 	if err != nil {
@@ -536,5 +556,5 @@ func initPeerConnection(ctx context.Context, slot, pass, sigserv, bearer string,
 		return nil, err
 	}
 
-	return &initPeerConnectionResult{Ws: ws, Wormhole: c, Exists: initMsg.Exists}, nil
+	return &initPeerConnectionResult{Ws: ws, Wormhole: c, Mode: initMsg.Mode}, nil
 }

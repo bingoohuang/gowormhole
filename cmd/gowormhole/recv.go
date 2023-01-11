@@ -17,7 +17,7 @@ import (
 	"github.com/bingoohuang/gowormhole/wormhole"
 )
 
-func receiveSubCmd(ctx context.Context, sigserv string, args ...string) {
+func receiveSubCmd(ctx context.Context, args ...string) {
 	dir, code, bearer, passLength := parseFlags(args)
 	if err := receiveRetry(ctx, &receiveFileArg{
 		BaseArg: BaseArg{
@@ -25,7 +25,7 @@ func receiveSubCmd(ctx context.Context, sigserv string, args ...string) {
 			Code:         code,
 			SecretLength: passLength,
 			Progress:     true,
-			Sigserv:      sigserv,
+			Sigserv:      Sigserv,
 			RetryTimes:   1,
 		},
 		Dir: dir,

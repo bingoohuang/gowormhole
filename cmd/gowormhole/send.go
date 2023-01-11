@@ -24,7 +24,30 @@ const (
 	msgChunkSize = 32 << 10
 )
 
-func sendSubCmd(ctx context.Context, sigserv string, args ...string) {
+func createCodeCmd(ctx context.Context, args ...string) {
+	set := flag.NewFlagSet(args[0], flag.ExitOnError)
+	set.Usage = func() {
+		_, _ = fmt.Fprintf(set.Output(), "create code\n\n")
+		_, _ = fmt.Fprintf(set.Output(), "flags:\n")
+		set.PrintDefaults()
+	}
+	length := set.Int("length", 2, "length of generated secret")
+	pBearer := set.String("bearer", os.Getenv("BEARER"), "Bearer authentication")
+	_ = set.Parse(args[1:])
+
+	code, err := requestCode(CodeReq{
+		Bearer:       *pBearer,
+		SecretLength: *length,
+		Sigserv:      Sigserv,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("code: %s, slotNum: %d\n", code.Code, code.SlotNum)
+}
+
+func sendSubCmd(ctx context.Context, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "send files\n\n")
@@ -49,7 +72,7 @@ func sendSubCmd(ctx context.Context, sigserv string, args ...string) {
 			Code:         *code,
 			SecretLength: *length,
 			Progress:     true,
-			Sigserv:      sigserv,
+			Sigserv:      Sigserv,
 			RetryTimes:   1,
 		},
 		Files: set.Args(),

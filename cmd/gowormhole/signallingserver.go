@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/NYTimes/gziphandler"
@@ -96,21 +97,19 @@ func relay(w http.ResponseWriter, r *http.Request) {
 	initMsg := wormhole.InitMsg{ICEServers: append(turnServers(), stunServers...)}
 	slotKey := r.URL.Path[1:] // strip leading slash
 
-	var rconn *websocket.Conn
+	var rconn atomic.Pointer[websocket.Conn]
 
-	go func() {
-		if rc, err := joinPeers(ctx, slotKey, conn, initMsg); err != nil {
-			log.Printf("join peers failed: %v", err)
-			if se, ok := err.(*slotError); ok {
-				if se.CloseReason != "" {
-					_ = conn.Close(se.CloseCode, se.CloseReason)
-					slots.Delete(slotKey)
-				}
+	if rc, err := joinPeers(ctx, slotKey, conn, initMsg); err != nil {
+		log.Printf("join peers failed: %v", err)
+		if se, ok := err.(*slotError); ok {
+			if se.CloseReason != "" {
+				_ = conn.Close(se.CloseCode, se.CloseReason)
+				slots.Delete(slotKey)
 			}
-		} else {
-			rconn = rc
 		}
-	}()
+	} else {
+		rconn.Store(rc)
+	}
 
 	defer cancel()
 	for {
@@ -120,7 +119,7 @@ func relay(w http.ResponseWriter, r *http.Request) {
 			switch websocket.CloseStatus(err) {
 			case wormhole.CloseBadKey:
 				iceCounter.WithLabelValues("fail", "badkey").Inc()
-				closeConn(rconn, wormhole.CloseBadKey, "bad key")
+				closeConn(rconn.Load(), wormhole.CloseBadKey, "bad key")
 			case wormhole.CloseWebRTCFailed:
 				iceCounter.WithLabelValues("fail", "unknown").Inc()
 			case wormhole.CloseWebRTCSuccess:
@@ -131,17 +130,19 @@ func relay(w http.ResponseWriter, r *http.Request) {
 				iceCounter.WithLabelValues("success", "relay").Inc()
 			default:
 				iceCounter.WithLabelValues("unknown", "unknown").Inc()
-				closeConn(rconn, wormhole.ClosePeerHungUp, "peer hung up")
+				closeConn(rconn.Load(), wormhole.ClosePeerHungUp, "peer hung up")
 			}
 
 			return
 		}
-		if rconn == nil {
+
+		rc := rconn.Load()
+		if rc == nil {
 			// We could synchronise with the rendezvous goroutine above and wait for  B to connect,
 			// but receiving anything at this stage is a protocol violation, so we should just bail out.
 			return
 		}
-		if err := rconn.Write(ctx, msgType, p); err != nil {
+		if err := rc.Write(ctx, msgType, p); err != nil {
 			log.Printf("write error: %v", err)
 			return
 		}
@@ -168,17 +169,20 @@ func closeConn(c *websocket.Conn, code websocket.StatusCode, reason string) {
 }
 
 func joinPeers(ctx context.Context, slotKey string, conn *websocket.Conn, initMsg wormhole.InitMsg) (*websocket.Conn, error) {
-	slot, err := slots.Setup(slotKey, false)
+	slot, err := slots.Setup(slotKey)
 	if err != nil {
 		return nil, err
 	}
 	initMsg.Slot = slot.SlotKey
-	initMsg.Exists = slot.Exists
+	initMsg.Mode = slot.Mode
 	if err := writeConn(ctx, conn, initMsg); err != nil {
 		return nil, err
 	}
 
-	if !slot.Exists {
+	log.Printf("slot: %s mode: %s", slot.SlotKey, slot.Mode)
+
+	if slot.Mode == wormhole.ModePeer1 {
+		// write current conn to slot.C
 		if err := waitPair(ctx, conn, slot.C, slotKey); err != nil {
 			return nil, err
 		}
@@ -214,7 +218,7 @@ func waitPair(ctx context.Context, conn *websocket.Conn, sc chan *websocket.Conn
 	}
 }
 
-func signallingServerCmd(ctx context.Context, sigserv string, args ...string) {
+func signallingServerCmd(ctx context.Context, args ...string) {
 	f := flag.NewFlagSet(args[0], flag.ExitOnError)
 	f.Usage = func() {
 		_, _ = fmt.Fprintf(f.Output(), "run the gowormhole signalling server\n\n")
@@ -265,7 +269,7 @@ func signallingServerCmd(ctx context.Context, sigserv string, args ...string) {
 			return
 		}
 
-		if strings.ToLower(r.Header.Get("GoWormhole")) == "reserve_slot_key" {
+		if r.Header.Get("GoWormhole") == GowormholeReserveslotkey {
 			reserveSlotKey(w)
 			return
 		}
@@ -332,13 +336,13 @@ func signallingServerCmd(ctx context.Context, sigserv string, args ...string) {
 		Handler:      m.HTTPHandler(http.HandlerFunc(handler)),
 	}
 
-	errc := make(chan error)
+	errCh := make(chan error)
 	if *debugAddr != "" {
 		http.Handle("/metrics", promhttp.Handler())
-		go func() { errc <- http.ListenAndServe(*debugAddr, nil) }()
+		go func() { errCh <- http.ListenAndServe(*debugAddr, nil) }()
 	}
 	if *httpsAddr != "" {
-		ssrv := &http.Server{
+		server := &http.Server{
 			ReadTimeout:  10 * time.Second,
 			WriteTimeout: 60 * time.Minute,
 			IdleTimeout:  20 * time.Second,
@@ -357,15 +361,15 @@ func signallingServerCmd(ctx context.Context, sigserv string, args ...string) {
 			},
 		}
 		if *cert == "" && *key == "" {
-			ssrv.TLSConfig.GetCertificate = m.GetCertificate
+			server.TLSConfig.GetCertificate = m.GetCertificate
 		}
 		srv.Handler = m.HTTPHandler(nil) // Enable redirect to https handler.
-		go func() { errc <- ssrv.ListenAndServeTLS(*cert, *key) }()
+		go func() { errCh <- server.ListenAndServeTLS(*cert, *key) }()
 	}
 	if *httpAddr != "" {
-		go func() { errc <- srv.ListenAndServe() }()
+		go func() { errCh <- srv.ListenAndServe() }()
 	}
-	log.Fatal(<-errc)
+	log.Fatal(<-errCh)
 }
 
 type reserveSlotResult struct {
@@ -374,7 +378,7 @@ type reserveSlotResult struct {
 }
 
 func reserveSlotKey(w http.ResponseWriter) {
-	item, err := slots.Setup("", true)
+	item, err := slots.Reserve()
 
 	var result reserveSlotResult
 	if err != nil {

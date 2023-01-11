@@ -23,7 +23,7 @@ import (
 	"github.com/go-resty/resty/v2"
 )
 
-func httpCmd(ctx context.Context, sigserv string, args ...string) {
+func httpCmd(ctx context.Context, args ...string) {
 	f := flag.NewFlagSet(args[0], flag.ExitOnError)
 	f.Usage = func() {
 		_, _ = fmt.Fprintf(f.Output(), "run the gowormhole http server\n\n")
@@ -133,16 +133,20 @@ func init() {
 	rest.SetTimeout(10 * time.Second)
 }
 
+type CodeReq struct {
+	Bearer       string `json:"bearer"`
+	SecretLength int    `json:"secretLength" default:"2"`
+	Sigserv      string `json:"sigserv"`
+}
+
+type CodeRsp struct {
+	Code string `json:"code"`
+	Err  error  `json:"error,omitempty"`
+}
+
 func createCode(argJSON string) (resultJSON string) {
-	var req struct {
-		Bearer       string `json:"bearer"`
-		SecretLength int    `json:"secretLength" default:"2"`
-		Sigserv      string `json:"sigserv"`
-	}
-	var result struct {
-		Code string `json:"code"`
-		Err  error  `json:"error,omitempty"`
-	}
+	var req CodeReq
+	var result CodeRsp
 
 	defer func() {
 		if result.Err != nil {
@@ -161,20 +165,40 @@ func createCode(argJSON string) (resultJSON string) {
 
 	defaults.Set(&req)
 
-	var reserveResult reserveSlotResult
-	_, err := rest.R().
-		SetHeader("GoWormhole", "reserve_slot_key").
-		SetHeader("Authorization", "bearer "+req.Bearer).
-		SetResult(&reserveResult).
-		Get(ss.Or(req.Sigserv, DefaultSigserv))
+	code, err := requestCode(req)
 	if err != nil {
 		result.Err = fmt.Errorf("reserve slot failed: %w", err)
 		return
 	}
 
-	pass := string(util.RandPass(req.SecretLength))
+	result.Code = code.Code
+	return
+}
+
+type CodeStruct struct {
+	SlotNum int
+	Pass    []byte
+	Code    string
+}
+
+const GowormholeReserveslotkey = "reserve_slot_key"
+
+func requestCode(req CodeReq) (codeStruct CodeStruct, err error) {
+	var reserveResult reserveSlotResult
+	_, err = rest.R().
+		SetHeader("GoWormhole", GowormholeReserveslotkey).
+		SetHeader("Authorization", "bearer "+req.Bearer).
+		SetResult(&reserveResult).
+		Get(ss.Or(req.Sigserv, Sigserv))
+	pass := util.RandPass(req.SecretLength)
 	slotNum, _ := strconv.Atoi(reserveResult.Key)
-	result.Code = wordlist.Encode(slotNum, []byte(pass))
+	code := wordlist.Encode(slotNum, pass)
+	codeStruct = CodeStruct{
+		SlotNum: slotNum,
+		Pass:    pass,
+		Code:    code,
+	}
+
 	return
 }
 

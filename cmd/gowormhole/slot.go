@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/bingoohuang/gowormhole/internal/util"
+	"github.com/bingoohuang/gowormhole/wormhole"
 	"nhooyr.io/websocket"
 )
 
@@ -26,16 +27,15 @@ func NewSlotError(slotKey string, closeCode websocket.StatusCode, closeReason st
 }
 
 func (s slotError) Error() string {
-	return fmt.Sprintf("SlotKey: %s, CloseCode: %d, clsoeReason: %s, error: %v", s.SlotKey, s.CloseCode, s.CloseReason, s.Err)
+	return fmt.Sprintf("SlotKey: %s, CloseCode: %d, closeReason: %s, error: %v", s.SlotKey, s.CloseCode, s.CloseReason, s.Err)
 }
 
 var _ error = (*slotError)(nil)
 
 type SlotItem struct {
-	SlotKey  string
-	C        chan *websocket.Conn
-	Exists   bool
-	Reserved bool
+	SlotKey string
+	C       chan *websocket.Conn
+	Mode    wormhole.SlotItemMode
 }
 
 type Slots struct {
@@ -54,7 +54,24 @@ func (r *Slots) Delete(slotKey string) {
 // slots is a map of allocated slot numbers.
 var slots = Slots{m: make(map[string]*SlotItem)}
 
-func (r *Slots) Setup(slotKey string, reserving bool) (*SlotItem, error) {
+func (r *Slots) Reserve() (*SlotItem, error) {
+	slotKey, _ := r.free()
+	if slotKey == "" {
+		rendezvousCounter.WithLabelValues("nomoreslots").Inc()
+		return nil, fmt.Errorf("no more slots available")
+	}
+
+	item := &SlotItem{
+		SlotKey: slotKey,
+		C:       make(chan *websocket.Conn),
+		Mode:    wormhole.ModeNone,
+	}
+
+	r.m[slotKey] = item
+	return item, nil
+}
+
+func (r *Slots) Setup(slotKey string) (*SlotItem, error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -68,9 +85,9 @@ func (r *Slots) Setup(slotKey string, reserving bool) (*SlotItem, error) {
 		}
 
 		item = &SlotItem{
-			SlotKey:  slotKey,
-			C:        make(chan *websocket.Conn),
-			Reserved: reserving,
+			SlotKey: slotKey,
+			C:       make(chan *websocket.Conn),
+			Mode:    wormhole.ModePeer1,
 		}
 
 		r.m[slotKey] = item
@@ -79,13 +96,13 @@ func (r *Slots) Setup(slotKey string, reserving bool) (*SlotItem, error) {
 		return item, nil
 	}
 
-	if item.Reserved {
-		item.Reserved = false
-	} else {
+	if item.Mode == wormhole.ModeNone {
+		item.Mode = wormhole.ModePeer1
+		return item, nil
+	} else if item.Mode == wormhole.ModePeer1 {
+		item.Mode = wormhole.ModePeer2
 		delete(r.m, slotKey)
-		item.Exists = true
-
-		slotsGuage.Set(float64(len(slots.m)))
+		slotsGuage.Set(float64(len(r.m)))
 	}
 
 	return item, nil

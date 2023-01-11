@@ -17,10 +17,11 @@ import (
 	"github.com/bingoohuang/gowormhole/wormhole"
 )
 
-var subcmds = map[string]func(ctx context.Context, sigserv string, args ...string){
+var subcmds = map[string]func(ctx context.Context, args ...string){
 	"publicip":    publicIPSubCmd,
 	"nat":         natSubCmd,
 	"send":        sendSubCmd,
+	"code":        createCodeCmd,
 	"receive":     receiveSubCmd,
 	"recv":        receiveSubCmd,
 	"pipe":        pipeSubCmd,
@@ -30,7 +31,8 @@ var subcmds = map[string]func(ctx context.Context, sigserv string, args ...strin
 	"turn-client": turnClientSubCmd,
 }
 
-const DefaultSigserv = "http://gowormhole.d5k.co"
+// Sigserv use env $SIGSERV to set signalling server to use
+var Sigserv = ss.Or(os.Getenv("SIGSERV"), "http://gowormhole.d5k.co")
 
 func usage() {
 	util.Printf("gowormhole creates ephemeral pipes between computers.\n\n")
@@ -47,7 +49,6 @@ func usage() {
 func main() {
 	showVersion := flag.Bool("version", false, "show version and exit")
 	verbose := flag.Bool("verbose", util.GetEnvBool("VERBOSE", true), "verbose logging")
-	sigserv := flag.String("signal", os.Getenv("SIGSERV"), "signalling server to use")
 	flag.Usage = usage
 	flag.Parse()
 	if *showVersion {
@@ -66,7 +67,7 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	cmd(context.TODO(), *sigserv, flag.Args()...)
+	cmd(context.TODO(), flag.Args()...)
 }
 
 var ErrRetryUnsupported = errors.New("retry Unsupported")
@@ -84,7 +85,7 @@ func newConn(ctx context.Context, sigserv, bearer, code string, length int, time
 		pass = string(pass1)
 	}
 
-	c, err := wormhole.Setup(ctx, slotKey, pass, ss.Or(sigserv, DefaultSigserv), bearer, timeouts)
+	c, err := wormhole.Setup(ctx, slotKey, pass, ss.Or(sigserv, Sigserv), bearer, timeouts)
 	if err != nil {
 		return nil, fmt.Errorf("could not dial: %w", err)
 	}

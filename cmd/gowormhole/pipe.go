@@ -10,7 +10,7 @@ import (
 	"github.com/bingoohuang/gowormhole/internal/util"
 )
 
-func pipeSubCmd(ctx context.Context, sigserv string, args ...string) {
+func pipeSubCmd(ctx context.Context, args ...string) {
 	set := flag.NewFlagSet(args[0], flag.ExitOnError)
 	set.Usage = func() {
 		_, _ = fmt.Fprintf(set.Output(), "netcat-like pipe\n\n")
@@ -27,7 +27,7 @@ func pipeSubCmd(ctx context.Context, sigserv string, args ...string) {
 		set.Usage()
 		os.Exit(2)
 	}
-	c, err := newConn(context.TODO(), sigserv, *pBearer, set.Arg(0), *length, nil)
+	c, err := newConn(context.TODO(), Sigserv, *pBearer, set.Arg(0), *length, nil)
 	util.FatalfIf(err != nil, "new connection failed: %v", err)
 
 	done := make(chan struct{})
