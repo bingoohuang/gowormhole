@@ -148,8 +148,8 @@ func sendJSON(c io.Writer, v interface{}) error {
 }
 
 func recvJSON(c io.Reader, v interface{}) ([]byte, error) {
-	// First message is the header. 10k should be enough.
-	buf := make([]byte, 1<<11)
+	// First message is the header. 1M should be enough.
+	buf := make([]byte, 1024*1024)
 	n, err := c.Read(buf)
 	if err != nil {
 		if err == io.EOF {
